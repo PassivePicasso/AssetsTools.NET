@@ -13,7 +13,9 @@ namespace AssetsTools.NET
         public bool align;
         public bool hasValue;
         public int childrenCount;
+        public int version;
         public AssetTypeTemplateField[] children;
+        public AssetTypeTemplateField parent;
 
         public bool From0D(Type_0D u5Type, int fieldIndex)
         {
@@ -24,6 +26,7 @@ namespace AssetsTools.NET
             isArray = field.isArray == 1 ? true : false;
             align = (field.flags & 0x4000) != 0x00 ? true : false;
             hasValue = (valueType == EnumValueTypes.None) ? false : true;
+            version = field.version;
 
             List<int> childrenIndexes = new List<int>();
             int thisDepth = u5Type.typeFieldsEx[fieldIndex].depth;
@@ -44,12 +47,14 @@ namespace AssetsTools.NET
                 {
                     children[child] = new AssetTypeTemplateField();
                     children[child].From0D(u5Type, childrenIndexes[child]);
+                    children[child].parent = this;
                     child++;
                 }
                 if (u5Type.typeFieldsEx[i].depth <= thisDepth) break;
             }
             return true;
         }
+
         public bool FromClassDatabase(ClassDatabaseFile file, ClassDatabaseType type, uint fieldIndex)
         {
             ClassDatabaseTypeField field = type.fields[(int)fieldIndex];
@@ -59,6 +64,7 @@ namespace AssetsTools.NET
             isArray = field.isArray == 1 ? true : false;
             align = (field.flags2 & 0x4000) != 0x00 ? true : false;
             hasValue = (valueType == EnumValueTypes.None) ? false : true;
+            version = field.version;
 
             List<int> childrenIndexes = new List<int>();
             int thisDepth = type.fields[(int)fieldIndex].depth;
@@ -79,12 +85,14 @@ namespace AssetsTools.NET
                 {
                     children[child] = new AssetTypeTemplateField();
                     children[child].FromClassDatabase(file, type, (uint)childrenIndexes[child]);
+                    children[child].parent = this;
                     child++;
                 }
                 if (type.fields[i].depth <= thisDepth) break;
             }
             return true;
         }
+
         public AssetTypeValueField MakeValue(AssetsFileReader reader)
         {
             AssetTypeValueField valueField = new AssetTypeValueField();
@@ -147,9 +155,17 @@ namespace AssetsTools.NET
                 if (type != 0) valueField.value = new AssetTypeValue(type, null);
                 if (type == EnumValueTypes.String)
                 {
-                    int length = reader.ReadInt32();
-                    valueField.value.Set(reader.ReadBytes(length));
-                    reader.Align();
+#warning Apparantly there can be a case where string child is not an array but just int (some field in PlayableDirector class) maybe think something better
+                    if (valueField.templateField.children[0].hasValue)
+                    {
+                        valueField.value.Set(reader.ReadInt32().ToString());
+                    }
+                    else
+                    {
+                        int length = reader.ReadInt32();
+                        valueField.value.Set(reader.ReadBytes(length));
+                        reader.Align();
+                    }
                 }
                 else
                 {

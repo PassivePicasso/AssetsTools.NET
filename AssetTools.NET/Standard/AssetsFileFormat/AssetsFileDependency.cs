@@ -7,31 +7,15 @@ namespace AssetsTools.NET
 {
     public class AssetsFileDependency
     {
-        public struct GUID128
-        {
-            public long mostSignificant;
-            public long leastSignificant;
-            public void Read(AssetsFileReader reader)
-            {
-                mostSignificant = reader.ReadInt64();
-                leastSignificant = reader.ReadInt64();
-            }
-            public void Write(AssetsFileWriter writer)
-            {
-                writer.Write(mostSignificant);
-                writer.Write(leastSignificant);
-            }
-        }
         public string bufferedPath;
-        public GUID128 guid;
+        public Guid guid;
         public int type;
         public string assetPath;
         public string originalAssetPath;
         public void Read(AssetsFileReader reader)
         {
             bufferedPath = reader.ReadNullTerminated();
-            guid = new GUID128();
-            guid.Read(reader);
+            guid = new Guid(reader.ReadBytes(16));
             type = reader.ReadInt32();
             assetPath = reader.ReadNullTerminated();
             originalAssetPath = assetPath;
@@ -59,7 +43,7 @@ namespace AssetsTools.NET
         public void Write(AssetsFileWriter writer)
         {
             writer.WriteNullTerminated(bufferedPath);
-            guid.Write(writer);
+            writer.Write(guid.ToByteArray());
             writer.Write(type);
             string assetPathTemp = assetPath;
             if ((assetPath == "Resources/unity_builtin_extra" ||

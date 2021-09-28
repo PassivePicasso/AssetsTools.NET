@@ -174,40 +174,67 @@ namespace AssetsTools.NET.Extra
             }
             return localChildren;
         }
+
         private List<FieldDefinition> GetAcceptableFields(TypeDefinition typeDef)
         {
             List<FieldDefinition> validFields = new List<FieldDefinition>();
             foreach (FieldDefinition f in typeDef.Fields)
             {
-                if (HasFlag(f.Attributes, FieldAttributes.Public) ||
-                    f.CustomAttributes.Any(a => a.AttributeType.Name.Equals("SerializeField"))) //field is public or has exception attribute
+                if (!HasFlag(f.Attributes, FieldAttributes.Public) &&
+                    !f.CustomAttributes.Any(a => a.AttributeType.Name.Equals("SerializeField"))) //field is public or has exception attribute
                 {
-                    if (!HasFlag(f.Attributes, FieldAttributes.Static) &&
-                        !HasFlag(f.Attributes, FieldAttributes.NotSerialized) &&
-                        !f.IsInitOnly &&
-                        !f.HasConstant) //field is not public, has exception attribute, readonly, or const
+                    continue;
+                }
+
+                if (HasFlag(f.Attributes, FieldAttributes.Static) ||
+                    HasFlag(f.Attributes, FieldAttributes.NotSerialized) ||
+                    f.IsInitOnly ||
+                    f.HasConstant) //field is not public, has exception attribute, readonly, or const
+                {
+                    continue;
+                }
+
+                //Unity can't serialize collection of collections, ignorig them
+                TypeReference ft = f.FieldType;
+                if (f.FieldType.IsArray)
+                {
+                    ft = ft.GetElementType();
+                    if (ft.IsArray || ft.FullName == "System.Collections.Generic.List`1")
                     {
-                        TypeReference ft = f.FieldType;
-                        if (f.FieldType.IsArray)
-                        {
-                            ft = ft.GetElementType();
-                        }
-                        TypeDefinition ftd = ft.Resolve();
-                        if (ftd != null)
-                        {
-                            if (ftd.IsPrimitive ||
-                                ftd.IsEnum ||
-                                ftd.IsSerializable ||
-                                DerivesFromUEObject(ftd) ||
-                                IsSpecialUnityType(ftd)) //field has a serializable type
-                            {
-                                validFields.Add(f);
-                            }
-                        }
+                        continue;
                     }
+                }
+                else if (ft is GenericInstanceType gft && gft.ElementType.FullName == "System.Collections.Generic.List`1")
+                {
+                    var elem = gft.GenericArguments[0].GetElementType().Resolve();
+                    if (elem.IsArray || elem.FullName == "System.Collections.Generic.List`1" || !IsValidDef(elem))
+                    {
+                        continue;
+                    }
+                }
+                TypeDefinition ftd = ft.Resolve();
+                
+                if (ftd != null && IsValidDef(ftd))
+                {
+                    validFields.Add(f);
                 }
             }
             return validFields;
+
+            bool IsValidDef(TypeDefinition def)
+            {
+                //object has IsSerializable=true, which means it passes other check while it shouldn't
+                if (def.FullName == "System.Object")
+                {
+                    return false;
+                }
+
+                return def.IsPrimitive ||
+                       def.IsEnum ||
+                       def.IsSerializable ||
+                       DerivesFromUEObject(def) ||
+                       IsSpecialUnityType(def);
+            }
         }
         private Dictionary<string, string> baseToPrimitive = new Dictionary<string, string>()
         {
@@ -492,14 +519,14 @@ namespace AssetsTools.NET.Extra
             AssetTypeTemplateField value = CreateTemplateField("value", "float", EnumValueTypes.Float);
             AssetTypeTemplateField inSlope = CreateTemplateField("inSlope", "float", EnumValueTypes.Float);
             AssetTypeTemplateField outSlope = CreateTemplateField("outSlope", "float", EnumValueTypes.Float);
-            //new in 2019
+            //new in 2018.1
             AssetTypeTemplateField weightedMode = CreateTemplateField("weightedMode", "int", EnumValueTypes.Int32);
             AssetTypeTemplateField inWeight = CreateTemplateField("inWeight", "float", EnumValueTypes.Float);
             AssetTypeTemplateField outWeight = CreateTemplateField("outWeight", "float", EnumValueTypes.Float);
             /////////////
             AssetTypeTemplateField size = CreateTemplateField("size", "int", EnumValueTypes.Int32);
             AssetTypeTemplateField data;
-            if (format >= 0x13)
+            if (format >= 0x11)
             {
                 data = CreateTemplateField("data", "Keyframe", EnumValueTypes.None, 7, new AssetTypeTemplateField[] {
                     time, value, inSlope, outSlope, weightedMode, inWeight, outWeight

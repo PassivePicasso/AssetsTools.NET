@@ -75,9 +75,9 @@ namespace AssetsTools.NET
                 get { return (double)value; }
                 set { this.value = value; }
             }
-            public byte[] asString
+            public string asString
             {
-                get { return (byte[])value; }
+                get { return (string)value; }
                 set { this.value = value; }
             }
         }
@@ -134,11 +134,11 @@ namespace AssetsTools.NET
                         break;
                     case EnumValueTypes.String:
                         if (valueContainer is byte[] byteArr)
-                            value.asString = byteArr;
+                            value.asString = Encoding.UTF8.GetString(byteArr);
                         else if (valueContainer is string str)
-                            value.asString = Encoding.UTF8.GetBytes(str);
+                            value.asString = str;
                         else
-                            value.asString = new byte[0];
+                            value.asString = string.Empty;
                         break;
                     case EnumValueTypes.Array:
                         value.asArray = (AssetTypeArray)valueContainer;
@@ -186,7 +186,7 @@ namespace AssetsTools.NET
                 case EnumValueTypes.Double:
                     return value.asDouble.ToString();
                 case EnumValueTypes.String:
-                    return Encoding.UTF8.GetString(value.asString);
+                    return value.asString;
                 case EnumValueTypes.None:
                 case EnumValueTypes.Array:
                 case EnumValueTypes.ByteArray:
@@ -196,7 +196,7 @@ namespace AssetsTools.NET
         }
         public byte[] AsStringBytes()
         {
-            return (type == EnumValueTypes.String) ? value.asString : null;
+            return (type == EnumValueTypes.String) ? Encoding.UTF8.GetBytes(value.asString) : null;
         }
         public bool AsBool()
         {

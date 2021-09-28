@@ -108,16 +108,22 @@ namespace AssetsView.Winforms
 
         private void RecurseReferences(AssetsFileInstance inst, AssetID thisId, AssetTypeValueField field, int depth = 0)
         {
+            if (field == null)
+            {
+                return;
+            }
+
             foreach (AssetTypeValueField child in field.children)
             {
+                //not null
+                if (child == null)
+                    continue;
+
                 //not a value (ie not an int)
                 if (!child.templateField.hasValue || child.templateField.isArray)
                 {
-                    //not null
-                    if (child == null)
-                        return;
                     //not array of values either
-                    if (child.templateField.isArray && child.templateField.children[1].valueType != EnumValueTypes.ValueType_None)
+                    if (child.templateField.isArray && child.templateField.children[1].valueType != EnumValueTypes.None)
                         continue;
                     string typeName = child.templateField.type;
                     //is a pptr

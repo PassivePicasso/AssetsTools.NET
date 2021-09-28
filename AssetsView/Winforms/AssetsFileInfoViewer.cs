@@ -65,11 +65,7 @@ namespace AssetsView.Winforms
             //dependencies
             foreach (AssetsFileDependency dep in file.dependencies.dependencies)
             {
-                string guid = string.Empty;
-                if (dep.guid.mostSignificant != 0 || dep.guid.leastSignificant != 0)
-                {
-                    guid = $"{dep.guid.mostSignificant.ToString("x8")}{dep.guid.leastSignificant.ToString("x8")}";
-                }
+                var guid = dep.guid == Guid.Empty ? string.Empty : dep.guid.ToString("N");
                 dep_list.Items.Add(new ListViewItem(new[] { dep.assetPath, "0x" + dep.type.ToString(), guid }));
             }
             dep_list.AutoResizeColumns(ColumnHeaderAutoResizeStyle.ColumnContent);
