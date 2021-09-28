@@ -7,6 +7,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AssetsTools.NET", "AssetToo
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AssetsView", "AssetsView\AssetsView.csproj", "{42D1011E-A1FB-424D-BB4E-C858EB088E9C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AssetsExporter", "AssetsExporter\AssetsExporter.csproj", "{008DE7F0-CDAC-4A6F-BEBE-A745F1470CBB}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -31,6 +33,14 @@ Global
 		{42D1011E-A1FB-424D-BB4E-C858EB088E9C}.Release|Any CPU.Build.0 = Release|Any CPU
 		{42D1011E-A1FB-424D-BB4E-C858EB088E9C}.Release|x64.ActiveCfg = Release|Any CPU
 		{42D1011E-A1FB-424D-BB4E-C858EB088E9C}.Release|x64.Build.0 = Release|Any CPU
+		{008DE7F0-CDAC-4A6F-BEBE-A745F1470CBB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{008DE7F0-CDAC-4A6F-BEBE-A745F1470CBB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{008DE7F0-CDAC-4A6F-BEBE-A745F1470CBB}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{008DE7F0-CDAC-4A6F-BEBE-A745F1470CBB}.Debug|x64.Build.0 = Debug|Any CPU
+		{008DE7F0-CDAC-4A6F-BEBE-A745F1470CBB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{008DE7F0-CDAC-4A6F-BEBE-A745F1470CBB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{008DE7F0-CDAC-4A6F-BEBE-A745F1470CBB}.Release|x64.ActiveCfg = Release|Any CPU
+		{008DE7F0-CDAC-4A6F-BEBE-A745F1470CBB}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

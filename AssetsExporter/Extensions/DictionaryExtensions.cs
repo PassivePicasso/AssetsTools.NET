@@ -1,0 +1,27 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Text;
+
+namespace AssetsExporter.Extensions
+{
+    public static class DictionaryExtensions
+    {
+        public static TValue GetOrAdd<TKey, TValue>(this Dictionary<TKey, TValue> dict, TKey key) where TValue : new()
+        {
+            if (!dict.TryGetValue(key, out var value))
+            {
+                dict[key] = value = new TValue();
+            }
+            return value;
+        }
+
+        public static T GetOrAdd<T>(this Dictionary<string, object> dict, string key) where T: new()
+        {
+            if (!dict.TryGetValue(key, out var value))
+            {
+                dict[key] = value = new T();
+            }
+            return (T)value;
+        }
+    }
+}
