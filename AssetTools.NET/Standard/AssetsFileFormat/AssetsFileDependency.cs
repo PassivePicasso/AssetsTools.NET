@@ -15,7 +15,7 @@ namespace AssetsTools.NET
         public void Read(AssetsFileReader reader)
         {
             bufferedPath = reader.ReadNullTerminated();
-            guid = new Guid(reader.ReadBytes(16));
+            guid = new Hash128(reader).ToGuid();
             type = reader.ReadInt32();
             assetPath = reader.ReadNullTerminated();
             originalAssetPath = assetPath;
@@ -40,6 +40,7 @@ namespace AssetsTools.NET
                 assetPath = "Resources/unity editor resources";
             }
         }
+
         public void Write(AssetsFileWriter writer)
         {
             writer.WriteNullTerminated(bufferedPath);
