@@ -10,7 +10,7 @@ namespace AssetsExporter.Collection
 {
     public class AssetCollection : BaseAssetCollection
     {
-        public override string ExportExtension => (UnityClass)(MainAsset?.info.curFileType ?? -1u) == UnityClass.GameObject ? "prefab" : "asset";
+        public override string ExportExtension => (AssetClassID)(MainAsset?.info.curFileType ?? -1u) == AssetClassID.GameObject ? "prefab" : "asset";
 
         public static AssetCollection CreateAssetCollection(AssetsManager assetsManager, AssetExternal asset)
         {

@@ -20,7 +20,7 @@ namespace AssetsExporter.YAMLExporters
                 {
                     throw new DirectoryNotFoundException($"Asset file doesn't have a TypeTree and couldn't find \"Managed\" folder at {managedPath}");
                 }
-                baseField = context.AssetsManager.GetMonoBaseFieldCached(context.SourceAsset.file, context.SourceAsset.info, managedPath);
+                baseField = context.AssetsManager.GetMonoBaseFieldCached(context.SourceAsset.file, context.SourceAsset.info, managedPath) ?? field;
             }
 
             return context.Export(parentField, baseField, false, typeof(MonoBehaviourExporter));

@@ -2,6 +2,7 @@
 using AssetsTools.NET;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 
 namespace AssetsExporter.YAMLExporters
@@ -10,12 +11,7 @@ namespace AssetsExporter.YAMLExporters
     {
         public YAMLNode Export(ExportContext context, AssetTypeValueField parentField, AssetTypeValueField field, bool raw = false)
         {
-            var node = new YAMLSequenceNode(SequenceStyle.Raw);
-            foreach (var child in field.children)
-            {
-                node.Add(child.GetValue().value.asUInt32);
-            }
-            return node;
+            return new YAMLScalarNode(new Hash128(field.children.Select(el => el.GetValue().AsUInt())).ToGuid().ToString("N"));
         }
     }
 }

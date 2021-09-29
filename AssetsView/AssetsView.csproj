@@ -29,6 +29,7 @@
     </Compile>
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\AssetsExporter\AssetsExporter.csproj" />
     <ProjectReference Include="..\AssetTools.NET\AssetsTools.NET.csproj" />
   </ItemGroup>
   <ItemGroup>

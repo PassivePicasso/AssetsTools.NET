@@ -55,11 +55,12 @@ namespace AssetsExporter.YAMLExporters
                 node.Add("fileID", pathID);
                 return node;
             }
-#warning TODO: asset may be a part of a collection which means guid should be something else
             AddFoundDependency(context, fileID, pathID);
             var file = fileID == 0 ? context.SourceAsset.file : context.SourceAsset.file.GetDependency(context.AssetsManager, fileID - 1);
+#warning TODO: introduce a way to supply cached map "asset => root asset" instead of calculating root asset each time beacuse it's pretty slow operation
+            var rootAsset = AssetsHelpers.GetRootAsset(context.AssetsManager, context.AssetsManager.GetExtAsset(context.SourceAsset.file, fileID, pathID));
             node.Add("fileID", pathID);
-            node.Add("guid", HashUtils.GetMD5HashGuid($"{pathID}{file.name}").ToString("N"));
+            node.Add("guid", HashUtils.GetMD5HashGuid($"{rootAsset.info.index}{file.name}").ToString("N"));
             node.Add("type", 2);
             return node;
         }

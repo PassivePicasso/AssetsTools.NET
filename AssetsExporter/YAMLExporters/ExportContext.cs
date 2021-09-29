@@ -13,10 +13,10 @@ namespace AssetsExporter.YAMLExporters
         public YAMLExportManager ExportManager { get; }
         public AssetsManager AssetsManager { get; }
         public AssetExternal SourceAsset { get; }
-        public AssetCollection Collection { get; }
+        public BaseAssetCollection Collection { get; }
         public Dictionary<string, object> Info { get; }
 
-        public ExportContext(YAMLExportManager exportManager, AssetsManager assetsManager, AssetCollection collection, AssetExternal sourceAsset)
+        public ExportContext(YAMLExportManager exportManager, AssetsManager assetsManager, BaseAssetCollection collection, AssetExternal sourceAsset)
         {
             ExportManager = exportManager;
             AssetsManager = assetsManager;

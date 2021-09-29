@@ -23,7 +23,7 @@ namespace AssetsExporter
             return exporter.Export(context, parentField, field, raw);
         }
 
-        public IEnumerable<YAMLDocument> Export(AssetCollection collection, AssetsManager manager)
+        public IEnumerable<YAMLDocument> Export(BaseAssetCollection collection, AssetsManager manager)
         {
             foreach (var asset in collection.Assets)
             {

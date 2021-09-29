@@ -2,6 +2,7 @@
 using AssetsExporter.YAML;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Text;
 
 namespace AssetsExporter.Meta
@@ -16,7 +17,9 @@ namespace AssetsExporter.Meta
         public MetaFile(string relativeFolderPath)
         {
             FolderAsset = true;
-            Guid = HashUtils.GetMD5HashGuid(relativeFolderPath);
+            //Assuming that relative path starts from project root and was made using Directory or Path classes so it has correct separator for current platform
+            //Then replacing that separator with '/', so that hash would be independent of a platform
+            Guid = HashUtils.GetMD5HashGuid(relativeFolderPath.Replace(Path.DirectorySeparatorChar, '/'));
             Importer = new DefaultImporter();
         }
 

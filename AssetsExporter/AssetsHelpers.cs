@@ -78,7 +78,7 @@ namespace AssetsExporter
 
             yield return rootAsset;
 
-            foreach (var spriteAsset in file.table.GetAssetsOfType((int)UnityClass.Sprite))
+            foreach (var spriteAsset in file.table.GetAssetsOfType((int)AssetClassID.Sprite))
             {
                 var spriteExt = assetsManager.GetExtAsset(file, 0, spriteAsset.index);
                 var textureExt = GetRootAsset(assetsManager, spriteExt);

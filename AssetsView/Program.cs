@@ -15,6 +15,14 @@ namespace AssetsView
         [STAThread]
         static void Main()
         {
+            var outputPath = @"D:\TestRip";
+            var gamePath = @"D:\SteamLibrary\steamapps\common\Risk of Rain 2\Risk of Rain 2.exe";
+            if (System.IO.Directory.Exists(outputPath))
+            {
+                System.IO.Directory.Delete(outputPath, true);
+            }
+            AssetsExporter.AssetExportManager.ExportGame(gamePath, outputPath);
+
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             Application.Run(new StartScreen());
