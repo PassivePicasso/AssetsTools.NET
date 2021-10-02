@@ -27,7 +27,7 @@ namespace AssetsTools.NET.Extra
             if (templateField.isArray ||
                 templateField.valueType == EnumValueTypes.String)
             {
-                valueChildren = new AssetTypeValueField[0];
+                valueChildren = Net35Polyfill.ArrayEmpty<AssetTypeValueField>();
             }
             else
             {

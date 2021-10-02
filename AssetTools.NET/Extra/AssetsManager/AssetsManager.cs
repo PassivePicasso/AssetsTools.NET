@@ -53,7 +53,13 @@ namespace AssetsTools.NET.Extra
 
         public AssetsFileInstance LoadAssetsFile(string path, bool loadDeps, string root = "")
         {
-            return LoadAssetsFile(File.OpenRead(path), loadDeps, root);
+            var fileStream = File.OpenRead(path);
+            var instance = LoadAssetsFile(fileStream, loadDeps, root);
+            if (instance.stream != fileStream)
+            {
+                fileStream.Dispose();
+            }
+            return instance;
         }
 
         public bool UnloadAssetsFile(string path)

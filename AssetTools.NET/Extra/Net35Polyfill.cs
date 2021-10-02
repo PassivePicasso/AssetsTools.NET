@@ -24,5 +24,19 @@ namespace AssetsTools.NET.Extra
                 bytes -= read;
             }
         }
+
+        public static T[] ArrayEmpty<T>()
+        {
+#if NET35 || NET40
+            return EmptyArray<T>.array;
+#else
+            return Array.Empty<T>();
+#endif
+        }
+
+        private class EmptyArray<T>
+        {
+            public static T[] array = new T[0];
+        }
     }
 }

@@ -1,4 +1,5 @@
-﻿using System;
+﻿using AssetsTools.NET.Extra;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 
@@ -23,9 +24,9 @@ namespace AssetsTools.NET
             name = field.GetNameString(u5Type.stringTable);
             type = field.GetTypeString(u5Type.stringTable);
             valueType = AssetTypeValueField.GetValueTypeByTypeName(type);
-            isArray = field.isArray == 1 ? true : false;
-            align = (field.flags & 0x4000) != 0x00 ? true : false;
-            hasValue = (valueType == EnumValueTypes.None) ? false : true;
+            isArray = field.isArray == 1;
+            align = (field.flags & 0x4000) != 0x00;
+            hasValue = valueType != EnumValueTypes.None;
             version = field.version;
 
             List<int> childrenIndexes = new List<int>();
@@ -39,7 +40,7 @@ namespace AssetsTools.NET
                 }
                 if (u5Type.typeFieldsEx[i].depth <= thisDepth) break;
             }
-            children = new AssetTypeTemplateField[childrenCount];
+            children = childrenCount == 0 ? Net35Polyfill.ArrayEmpty<AssetTypeTemplateField>() : new AssetTypeTemplateField[childrenCount];
             int child = 0;
             for (int i = fieldIndex + 1; i < u5Type.typeFieldsExCount; i++)
             {
@@ -52,6 +53,15 @@ namespace AssetsTools.NET
                 }
                 if (u5Type.typeFieldsEx[i].depth <= thisDepth) break;
             }
+
+            //Apparently, there can be a case where string child is not an array but just int (ExposedReferenceTable field in PlayableDirector class before 2018.4.29)
+            //For now, just set it to whatever type this child is. Maybe think something better later
+            if (valueType == EnumValueTypes.String && children[0].valueType == EnumValueTypes.Int32)
+            {
+                valueType = children[0].valueType;
+                childrenCount = 0;
+                children = Net35Polyfill.ArrayEmpty<AssetTypeTemplateField>();
+            }
             return true;
         }
 
@@ -61,9 +71,9 @@ namespace AssetsTools.NET
             name = field.fieldName.GetString(file);
             this.type = field.typeName.GetString(file);
             valueType = AssetTypeValueField.GetValueTypeByTypeName(this.type);
-            isArray = field.isArray == 1 ? true : false;
-            align = (field.flags2 & 0x4000) != 0x00 ? true : false;
-            hasValue = (valueType == EnumValueTypes.None) ? false : true;
+            isArray = field.isArray == 1;
+            align = (field.flags2 & 0x4000) != 0x00;
+            hasValue = valueType != EnumValueTypes.None;
             version = field.version;
 
             List<int> childrenIndexes = new List<int>();
@@ -77,7 +87,7 @@ namespace AssetsTools.NET
                 }
                 if (type.fields[i].depth <= thisDepth) break;
             }
-            children = new AssetTypeTemplateField[childrenCount];
+            children = childrenCount == 0 ? Net35Polyfill.ArrayEmpty<AssetTypeTemplateField>() : new AssetTypeTemplateField[childrenCount];
             int child = 0;
             for (int i = (int)fieldIndex + 1; i < type.fields.Count; i++)
             {
@@ -89,6 +99,15 @@ namespace AssetsTools.NET
                     child++;
                 }
                 if (type.fields[i].depth <= thisDepth) break;
+            }
+
+            //Apparently, there can be a case where string child is not an array but just int (ExposedReferenceTable field in PlayableDirector class before 2018.4.29)
+            //For now, just set it to whatever type this child is. Maybe think something better later
+            if (valueType == EnumValueTypes.String && children[0].valueType != EnumValueTypes.None)
+            {
+                valueType = children[0].valueType;
+                childrenCount = 0;
+                children = Net35Polyfill.ArrayEmpty<AssetTypeTemplateField>();
             }
             return true;
         }
@@ -114,7 +133,7 @@ namespace AssetsTools.NET
                         if (valueField.templateField.valueType == EnumValueTypes.ByteArray)
                         {
                             valueField.childrenCount = 0;
-                            valueField.children = new AssetTypeValueField[0];
+                            valueField.children = Net35Polyfill.ArrayEmpty<AssetTypeValueField>();
                             int size = reader.ReadInt32();
                             byte[] data = reader.ReadBytes(size);
                             if (valueField.templateField.align) reader.Align();
@@ -126,7 +145,7 @@ namespace AssetsTools.NET
                         else
                         {
                             valueField.childrenCount = reader.ReadInt32();
-                            valueField.children = new AssetTypeValueField[valueField.childrenCount];
+                            valueField.children = valueField.childrenCount == 0 ? Net35Polyfill.ArrayEmpty<AssetTypeValueField>() : new AssetTypeValueField[valueField.childrenCount];
                             for (int i = 0; i < valueField.childrenCount; i++)
                             {
                                 valueField.children[i] = new AssetTypeValueField();
@@ -155,24 +174,16 @@ namespace AssetsTools.NET
                 if (type != 0) valueField.value = new AssetTypeValue(type, null);
                 if (type == EnumValueTypes.String)
                 {
-#warning Apparantly there can be a case where string child is not an array but just int (some field in PlayableDirector class) maybe think something better
-                    if (valueField.templateField.children[0].hasValue)
-                    {
-                        valueField.value.Set(reader.ReadInt32().ToString());
-                    }
-                    else
-                    {
-                        int length = reader.ReadInt32();
-                        valueField.value.Set(reader.ReadBytes(length));
-                        reader.Align();
-                    }
+                    int length = reader.ReadInt32();
+                    valueField.value.Set(reader.ReadBytes(length));
+                    reader.Align();
                 }
                 else
                 {
                     valueField.childrenCount = valueField.templateField.childrenCount;
                     if (valueField.childrenCount == 0)
                     {
-                        valueField.children = new AssetTypeValueField[0];
+                        valueField.children = Net35Polyfill.ArrayEmpty<AssetTypeValueField>();
                         switch (valueField.templateField.valueType)
                         {
                             case EnumValueTypes.Int8:

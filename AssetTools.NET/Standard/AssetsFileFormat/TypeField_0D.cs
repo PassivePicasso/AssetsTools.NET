@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using AssetsTools.NET.Extra;
+using System.Text;
 
 namespace AssetsTools.NET
 {
@@ -26,7 +27,7 @@ namespace AssetsTools.NET
             if (format >= 0x12)
                 unknown = reader.ReadBytes(8);
             else
-                unknown = new byte[0];
+                unknown = Net35Polyfill.ArrayEmpty<byte>();
         }
         public void Write(AssetsFileWriter writer, uint format)
         {
