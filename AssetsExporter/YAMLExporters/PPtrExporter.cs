@@ -1,5 +1,7 @@
-﻿using AssetsExporter.Extensions;
+﻿using AssetsExporter.Collection;
+using AssetsExporter.Extensions;
 using AssetsExporter.YAML;
+using AssetsExporter.YAMLExporters.Info;
 using AssetsTools.NET;
 using System;
 using System.Collections.Generic;
@@ -10,8 +12,6 @@ namespace AssetsExporter.YAMLExporters
 {
     public class PPtrExporter : IYAMLExporter
     {
-        public static string FoundExternalDependencies = nameof(FoundExternalDependencies);
-
         public YAMLNode Export(ExportContext context, AssetTypeValueField parentField, AssetTypeValueField field, bool raw = false)
         {
             var node = new YAMLMappingNode(MappingStyle.Flow);
@@ -21,21 +21,6 @@ namespace AssetsExporter.YAMLExporters
             if (pathID == 0)
             {
                 node.Add("fileID", 0);
-                return node;
-            }
-
-            if (field.GetName() == "m_Script")
-            {
-                var scriptAsset = context.AssetsManager.GetExtAsset(context.SourceAsset.file, field);
-                var scriptBase = scriptAsset.instance.GetBaseField();
-
-                var className = scriptBase.Get("m_ClassName").GetValue().value.asString;
-                var @namespace = scriptBase.Get("m_Namespace").GetValue().value.asString;
-                var assemblyName = scriptBase.Get("m_AssemblyName").GetValue().value.asString;
-#warning TODO: unity has guids for their extension assemblies in editor folder (ivy.xml files), so better use them
-                node.Add("fileID", HashUtils.ComputeScriptFileID(@namespace, className));
-                node.Add("guid", HashUtils.GetMD5HashGuid(Path.GetFileNameWithoutExtension(assemblyName)).ToString("N"));
-                node.Add("type", 3);
                 return node;
             }
 
@@ -50,25 +35,59 @@ namespace AssetsExporter.YAMLExporters
                     return node;
                 }
             }
-            else if (context.Collection.Assets.Any(el => el.info.index == pathID))
+
+            var file = fileID == 0 ? context.SourceAsset.file : context.SourceAsset.file.GetDependency(context.AssetsManager, fileID - 1);
+            var info = context.Info.GetOrAdd<PPtrExporterInfo>(nameof(PPtrExporterInfo));
+
+            if (field.GetName() == "m_Script")
+            {
+                var scriptsCache = info.scriptsCache.GetOrAdd(file);
+                if (!scriptsCache.TryGetValue(pathID, out var scriptRef))
+                {
+                    var scriptAsset = context.AssetsManager.GetExtAsset(context.SourceAsset.file, field);
+                    var scriptBase = scriptAsset.instance.GetBaseField();
+
+                    var className = scriptBase.Get("m_ClassName").GetValue().value.asString;
+                    var @namespace = scriptBase.Get("m_Namespace").GetValue().value.asString;
+                    var assemblyName = scriptBase.Get("m_AssemblyName").GetValue().value.asString;
+
+                    var scriptFileID = HashUtils.ComputeScriptFileID(@namespace, className);
+                    //Unity has guids for their extension assemblies in editor folder (ivy.xml files), use them if found
+                    if (!info.unityExtensionAssebmlies.TryGetValue(assemblyName, out var scriptGuid))
+                    {
+                        scriptGuid = HashUtils.GetMD5HashGuid(Path.GetFileNameWithoutExtension(assemblyName));
+                    }
+                    scriptsCache[pathID] = scriptRef = new KeyValuePair<long, Guid>(scriptFileID, scriptGuid);
+                }
+
+                node.Add("fileID", scriptRef.Key);
+                node.Add("guid", scriptRef.Value.ToString("N"));
+                node.Add("type", 3);
+                return node;
+            }
+            
+            if (fileID == 0 && context.Collection.Assets.Any(el => el.info.index == pathID))
             {
                 node.Add("fileID", pathID);
                 return node;
             }
-            AddFoundDependency(context, fileID, pathID);
-            var file = fileID == 0 ? context.SourceAsset.file : context.SourceAsset.file.GetDependency(context.AssetsManager, fileID - 1);
-#warning TODO: introduce a way to supply cached map "asset => root asset" instead of calculating root asset each time beacuse it's pretty slow operation
-            var rootAsset = AssetsHelpers.GetRootAsset(context.AssetsManager, context.AssetsManager.GetExtAsset(context.SourceAsset.file, fileID, pathID));
+
+            var assetToRootAsset = info.fileAssetToRootAsset.GetOrAdd(file);
+            if (!assetToRootAsset.TryGetValue(pathID, out var rootPathID))
+            {
+                var dependencyCollection = AssetCollection.CreateAssetCollection(context.AssetsManager, context.AssetsManager.GetExtAsset(file, 0, pathID));
+                info.foundNewCollections.Add(dependencyCollection);
+                rootPathID = dependencyCollection.MainAsset.Value.info.index;
+                foreach (var cAsset in dependencyCollection.Assets)
+                {
+                    assetToRootAsset[cAsset.info.index] = rootPathID;
+                }
+            }
+
             node.Add("fileID", pathID);
-            node.Add("guid", HashUtils.GetMD5HashGuid($"{rootAsset.info.index}{file.name}").ToString("N"));
+            node.Add("guid", HashUtils.GetMD5HashGuid($"{rootPathID}_{file.name}").ToString("N"));
             node.Add("type", 2);
             return node;
-        }
-
-        private void AddFoundDependency(ExportContext exportContext, int fileID, long pathID)
-        {
-            var externalDependencies = exportContext.Info.GetOrAdd<HashSet<(int, long)>>(FoundExternalDependencies);
-            externalDependencies.Add((fileID, pathID));
         }
     }
 }

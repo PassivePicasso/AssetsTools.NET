@@ -7,23 +7,22 @@ using System.Text;
 using AssetsExporter.YAML;
 using System.Text.RegularExpressions;
 using AssetsExporter.Collection;
+using System.Linq;
 
 namespace AssetsExporter
 {
-    public sealed class YAMLExportManager
+    public sealed partial class YAMLExportManager
     {
         private readonly SortedSet<IRegistrationContext> exporters = new SortedSet<IRegistrationContext>(new RegistrationContextComparer());
 
-        internal YAMLExportManager() { }
-
-        public YAMLNode Export(ExportContext context, AssetTypeValueField parentField, AssetTypeValueField field, bool raw = false, Type ignoreExporterType = null)
+        public YAMLNode Export(ExportContext context, AssetTypeValueField parentField, AssetTypeValueField field, bool raw = false, params Type[] ignoreExporterTypes)
         {
-            var exporter = PickExporter(context, parentField, field, ignoreExporterType);
+            var exporter = PickExporter(parentField, field, ignoreExporterTypes);
 
             return exporter.Export(context, parentField, field, raw);
         }
 
-        public IEnumerable<YAMLDocument> Export(BaseAssetCollection collection, AssetsManager manager)
+        public IEnumerable<YAMLDocument> Export(BaseAssetCollection collection, AssetsManager manager, Dictionary<string, object> extraInfo = null)
         {
             foreach (var asset in collection.Assets)
             {
@@ -31,14 +30,14 @@ namespace AssetsExporter
                 if (baseField.IsDummy())
                 {
                     yield return new YAMLDocument();
+                    continue;
                 }
 
-                var context = new ExportContext(this, manager, collection, asset);
+                var context = new ExportContext(this, manager, collection, asset, extraInfo);
+
                 var doc = new YAMLDocument();
                 var root = doc.CreateMappingRoot();
                 root.Tag = asset.info.curFileType.ToString();
-                //Maybe use something instead of an index?
-                //Though it's definitely unique per asset file which is enough in this case
                 root.Anchor = asset.info.index.ToString();
 
                 root.Add(baseField.templateField.type, context.Export(null, baseField));
@@ -46,27 +45,27 @@ namespace AssetsExporter
             }
         }
 
-        private IYAMLExporter PickExporter(ExportContext context, AssetTypeValueField parentField, AssetTypeValueField field, Type ignoreExporterType)
+        public IYAMLExporter PickExporter(AssetTypeValueField parentField, AssetTypeValueField field, params Type[] ignoreExporterTypes)
         {
             var template = field.templateField;
             foreach (var exporter in exporters)
             {
-                if (exporter.ExporterType == ignoreExporterType) continue;
+                if (ignoreExporterTypes.Contains(exporter.ExporterType)) continue;
                 if (template.hasValue && ((1u << (int)template.valueType - 1) & exporter.ValueType) == 0) continue;
                 if (!template.hasValue && exporter.ValueType != 0) continue;
                 if (parentField != null)
                 {
-                    if (!TypeMatch(exporter.ParentTypeNames, parentField.templateField.type)) continue;
-                    if (!TypeMatchRegex(exporter.RegexParentTypeNames, parentField.templateField.type)) continue;
+                    if (!TypeMatch(exporter.ParentTypeNames, parentField.templateField.type, StringComparer)) continue;
+                    if (!TypeMatch(exporter.RegexParentTypeNames, parentField.templateField.type, RegexComparer)) continue;
                 }
-                if (!TypeMatch(exporter.TypeNames, template.type)) continue;
-                if (!TypeMatchRegex(exporter.RegexTypeNames, template.type)) continue;
+                if (!TypeMatch(exporter.TypeNames, template.type, StringComparer)) continue;
+                if (!TypeMatch(exporter.RegexTypeNames, template.type, RegexComparer)) continue;
 
                 return exporter.ExporterInstance;
             }
             throw new NotSupportedException("Not found suitable exporter");
 
-            bool TypeMatch(HashSet<string> collection, string value)
+            bool TypeMatch<T>(HashSet<T> collection, string value, Func<T, string, bool> comparer)
             {
                 if (collection.Count == 0)
                 {
@@ -75,7 +74,7 @@ namespace AssetsExporter
                 var match = false;
                 foreach (var item in collection)
                 {
-                    if (item == value)
+                    if (comparer(item, value))
                     {
                         match = true;
                         break;
@@ -83,24 +82,18 @@ namespace AssetsExporter
                 }
                 return match;
             }
+            bool StringComparer(string first, string second) => first == second;
+            bool RegexComparer(Regex first, string second) => first.IsMatch(second);
+        }
 
-            bool TypeMatchRegex(HashSet<Regex> collection, string value)
-            {
-                if (collection.Count == 0)
-                {
-                    return true;
-                }
-                var match = false;
-                foreach (var item in collection)
-                {
-                    if (item.IsMatch(value))
-                    {
-                        match = true;
-                        break;
-                    }
-                }
-                return match;
-            }
+        public YAMLExportManager RegisterExporter<T>(Action<RegistrationContext> action) where T : IYAMLExporter, new()
+        {
+            var registration = new RegistrationContext() as IRegistrationContext;
+            registration.ExporterInstance = new T();
+            registration.ExporterType = typeof(T);
+            action?.Invoke(registration as RegistrationContext);
+            exporters.Add(registration);
+            return this;
         }
 
         public static YAMLExportManager CreateDefault()
@@ -115,104 +108,18 @@ namespace AssetsExporter
                     .WhenTypeNameRegex(/* language=regex */ @"\APPtr<(.*)>\z"))
                 .RegisterExporter<ComponentPairExporter>(x => x
                     .WhenTypeName("ComponentPair"))
+                .RegisterExporter<PairExporter>(x => x
+                    .WhenTypeName("pair"))
                 .RegisterExporter<TypelessDataExporter>(x => x
                     .WhenTypeName("TypelessData"))
                 .RegisterExporter<StreamingInfoExporter>(x => x
                     .WhenTypeName("StreamingInfo"))
                 .RegisterExporter<GUIDExporter>(x => x
                     .WhenTypeName("GUID"))
+                .RegisterExporter<ShaderEmptyDependenciesExporter>(x => x
+                    .WhenTypeName("Shader"))
                 .RegisterExporter<GenericExporter>(x => x
                     .WithPriority(int.MinValue));
-        }
-
-        public YAMLExportManager RegisterExporter<T>(Action<RegistrationContext> action) where T : IYAMLExporter, new()
-        {
-            var registration = new RegistrationContext() as IRegistrationContext;
-            registration.ExporterInstance = new T();
-            registration.ExporterType = typeof(T);
-            action?.Invoke(registration as RegistrationContext);
-            exporters.Add(registration);
-            return this;
-        }
-
-        private interface IRegistrationContext
-        {
-            IYAMLExporter ExporterInstance { get; set; }
-            Type ExporterType { get; set; }
-            int Priority { get; set; }
-            HashSet<string> TypeNames { get; }
-            HashSet<Regex> RegexTypeNames { get; }
-            HashSet<string> ParentTypeNames { get; }
-            HashSet<Regex> RegexParentTypeNames { get; }
-            uint ValueType { get; set; }
-        }
-
-        //Sort by descending
-        private class RegistrationContextComparer : IComparer<IRegistrationContext>
-        {
-            public int Compare(IRegistrationContext x, IRegistrationContext y)
-            {
-                return x.Priority > y.Priority ? -1 : 1;
-            }
-        }
-
-        public class RegistrationContext : IRegistrationContext
-        {
-            Type IRegistrationContext.ExporterType { get; set; }
-            IYAMLExporter IRegistrationContext.ExporterInstance { get; set; }
-            int IRegistrationContext.Priority { get; set; }
-            HashSet<string> IRegistrationContext.TypeNames { get; } = new HashSet<string>();
-            HashSet<Regex> IRegistrationContext.RegexTypeNames { get; } = new HashSet<Regex>();
-            HashSet<string> IRegistrationContext.ParentTypeNames { get; } = new HashSet<string>();
-            HashSet<Regex> IRegistrationContext.RegexParentTypeNames { get; } = new HashSet<Regex>();
-            uint IRegistrationContext.ValueType { get; set; }
-
-            private IRegistrationContext ThisIRC => this;
-
-            public RegistrationContext WhenAnyValueType()
-            {
-                ThisIRC.ValueType = uint.MaxValue;
-                return this;
-            }
-
-            public RegistrationContext WhenValueType(EnumValueTypes valueType)
-            {
-                if (valueType != EnumValueTypes.None)
-                {
-                    ThisIRC.ValueType |= 1u << (int)valueType - 1;
-                }
-                return this;
-            }
-
-            public RegistrationContext WhenTypeName(string typeName)
-            {
-                ThisIRC.TypeNames.Add(typeName);
-                return this;
-            }
-
-            public RegistrationContext WhenTypeNameRegex(string typeNameRegex)
-            {
-                ThisIRC.RegexTypeNames.Add(new Regex(typeNameRegex, RegexOptions.Compiled));
-                return this;
-            }
-
-            public RegistrationContext WhenParentTypeName(string typeName)
-            {
-                ThisIRC.ParentTypeNames.Add(typeName);
-                return this;
-            }
-
-            public RegistrationContext WhenParentTypeNameRegex(string typeNameRegex)
-            {
-                ThisIRC.RegexParentTypeNames.Add(new Regex(typeNameRegex, RegexOptions.Compiled));
-                return this;
-            }
-
-            public RegistrationContext WithPriority(int priority)
-            {
-                ThisIRC.Priority = priority;
-                return this;
-            }
         }
     }
 }

@@ -16,13 +16,13 @@ namespace AssetsExporter.YAMLExporters
         public BaseAssetCollection Collection { get; }
         public Dictionary<string, object> Info { get; }
 
-        public ExportContext(YAMLExportManager exportManager, AssetsManager assetsManager, BaseAssetCollection collection, AssetExternal sourceAsset)
+        public ExportContext(YAMLExportManager exportManager, AssetsManager assetsManager, BaseAssetCollection collection, AssetExternal sourceAsset, Dictionary<string, object> info = null)
         {
             ExportManager = exportManager;
             AssetsManager = assetsManager;
             Collection = collection;
             SourceAsset = sourceAsset;
-            Info = new Dictionary<string, object>();
+            Info = info ?? new Dictionary<string, object>();
         }
 
         public YAMLNode Export(AssetTypeValueField parentField, AssetTypeValueField field, bool raw = false, Type ignoreExporterType = null)

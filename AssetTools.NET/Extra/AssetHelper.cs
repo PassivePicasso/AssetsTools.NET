@@ -109,12 +109,20 @@ namespace AssetsTools.NET.Extra
                 //todo, use the typetree since we have it already, there could be extra fields
                 else if (ttTypeName == "GameObject")
                 {
+                    //Not fast, but reliable, old solution could lead to a massive memory use if there are extra fields before name
                     reader.Position = info.absoluteFilePos;
-                    int size = reader.ReadInt32();
-                    int componentSize = file.header.format > 0x10 ? 0x0c : 0x10;
-                    reader.Position += size * componentSize;
-                    reader.Position += 0x04;
-                    return reader.ReadCountStringInt32();
+                    var aType = new AssetTypeTemplateField();
+                    aType.From0D(ttType, 0);
+                    var value = aType.MakeValue(reader);
+                    var name = value.Get("m_Name");
+                    return name.IsDummy() ? "" : name.GetValue().AsString();
+                    
+                    //reader.Position = info.absoluteFilePos;
+                    //int size = reader.ReadInt32();
+                    //int componentSize = file.header.format > 0x10 ? 0x0c : 0x10;
+                    //reader.Position += size * componentSize;
+                    //reader.Position += 0x04;
+                    //return reader.ReadCountStringInt32();
                 }
                 else if (ttTypeName == "MonoBehaviour")
                 {

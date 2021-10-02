@@ -1,10 +1,7 @@
-﻿using AssetsExporter.YAML.Utils.Extensions;
+﻿using AssetsExporter.YAML;
+using AssetsExporter.YAML.Utils.Extensions;
 using AssetsTools.NET;
-using AssetsTools.NET.Extra;
 using System;
-using System.Collections.Generic;
-using System.Text;
-using AssetsExporter.YAML;
 
 namespace AssetsExporter.YAMLExporters
 {
@@ -24,20 +21,15 @@ namespace AssetsExporter.YAMLExporters
 
             if (field.childrenCount == 1 && field.children[0].templateField.isArray)
             {
-                if (field.templateField.type == "map")
+                var arrayChild = field.children[0];
+                if (field.templateField.type == "map" && arrayChild.templateField.children[1].children[0].hasValue)
                 {
                     var node = new YAMLMappingNode();
-                    var arrayChild = field.children[0];
-
-                    if (arrayChild.childrenCount > 0)
+                    for (var i = 0; i < arrayChild.childrenCount; i++)
                     {
-                        for (var i = 0; i < arrayChild.childrenCount; i++)
-                        {
-                            var elem = arrayChild.children[i];
-                            node.Add(context.Export(arrayChild, elem.children[0]), context.Export(arrayChild, elem.children[1]));
-                        }
+                        var elem = arrayChild.children[i];
+                        node.Add(context.Export(arrayChild, elem.children[0]), context.Export(arrayChild, elem.children[1]));
                     }
-
                     return node;
                 }
                 return ExportHelpers.ExportArray(context, field.children[0]);

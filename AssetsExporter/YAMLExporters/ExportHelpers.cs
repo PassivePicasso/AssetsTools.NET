@@ -11,16 +11,8 @@ namespace AssetsExporter.YAMLExporters
     {
         public static YAMLNode ExportArray(ExportContext context, AssetTypeValueField arrayField)
         {
-            var childType = arrayField.templateField.children[1].type.ToLower();
-            var sequenceStyle = SequenceStyle.Block;
-            var cRaw = false;
-
-            if (childType == "uint8")
-            {
-                sequenceStyle = SequenceStyle.Raw;
-                cRaw = true;
-            }
-
+            var cRaw = arrayField.templateField.children[1].valueType == EnumValueTypes.UInt8;
+            var sequenceStyle = cRaw ? SequenceStyle.Raw : SequenceStyle.Block;
             var node = new YAMLSequenceNode(sequenceStyle);
 
             if (arrayField.childrenCount > 0)
