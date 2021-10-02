@@ -62,6 +62,19 @@ namespace AssetsTools.NET
                 childrenCount = 0;
                 children = Net35Polyfill.ArrayEmpty<AssetTypeTemplateField>();
             }
+
+            if (isArray)
+            {
+                if (children[1].valueType == EnumValueTypes.UInt8)
+                {
+                    valueType = EnumValueTypes.ByteArray;
+                }
+                else
+                {
+                    valueType = EnumValueTypes.Array;
+                }
+            }
+
             return true;
         }
 
@@ -103,12 +116,25 @@ namespace AssetsTools.NET
 
             //Apparently, there can be a case where string child is not an array but just int (ExposedReferenceTable field in PlayableDirector class before 2018.4.29)
             //For now, just set it to whatever type this child is. Maybe think something better later
-            if (valueType == EnumValueTypes.String && children[0].valueType != EnumValueTypes.None)
+            if (valueType == EnumValueTypes.String && !children[0].isArray && children[0].valueType != EnumValueTypes.None)
             {
                 valueType = children[0].valueType;
                 childrenCount = 0;
                 children = Net35Polyfill.ArrayEmpty<AssetTypeTemplateField>();
             }
+
+            if (isArray)
+            {
+                if (children[1].valueType == EnumValueTypes.UInt8)
+                {
+                    valueType = EnumValueTypes.ByteArray;
+                }
+                else
+                {
+                    valueType = EnumValueTypes.Array;
+                }
+            }
+
             return true;
         }
 
