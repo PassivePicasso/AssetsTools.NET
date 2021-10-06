@@ -38,10 +38,6 @@ namespace AssetsExporter.YAMLExporters
                     return new YAMLScalarNode(value.asDouble);
                 case EnumValueTypes.String:
                     return new YAMLScalarNode(value.asString);
-                case EnumValueTypes.Array:
-                    return ExportHelpers.ExportArray(context, field);
-                case EnumValueTypes.ByteArray:
-                    return value.asByteArray.data.ExportYAML();
             }
 
             throw new NotSupportedException("Complex types are not supported for this exporter");

@@ -35,6 +35,7 @@ namespace AssetsExporter
             AssetClassID.RuntimeInitializeOnLoadManager,
             AssetClassID.ScriptMapper,
             AssetClassID.StreamingManager,
+            AssetClassID.MonoScript,
         };
 
         private readonly AssetsManager assetsManager;
@@ -209,6 +210,10 @@ namespace AssetsExporter
                 {
                     var foundCollection = pptrExporterInfo.foundNewCollections[0];
                     pptrExporterInfo.foundNewCollections.RemoveAt(0);
+                    if (ignoreTypesOnExport.Contains((AssetClassID)(foundCollection.MainAsset?.info.curFileType ?? -1u)))
+                    {
+                        continue;
+                    }
                     ExportCollection(foundCollection);
                 }
 

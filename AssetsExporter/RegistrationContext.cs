@@ -18,6 +18,7 @@ namespace AssetsExporter
             HashSet<string> ParentTypeNames { get; }
             HashSet<Regex> RegexParentTypeNames { get; }
             uint ValueType { get; set; }
+            bool OnlyValueTypes { get; set; }
         }
 
         //Sort by descending
@@ -39,12 +40,29 @@ namespace AssetsExporter
             HashSet<string> IRegistrationContext.ParentTypeNames { get; } = new HashSet<string>();
             HashSet<Regex> IRegistrationContext.RegexParentTypeNames { get; } = new HashSet<Regex>();
             uint IRegistrationContext.ValueType { get; set; }
+            bool IRegistrationContext.OnlyValueTypes { get; set; }
 
             private IRegistrationContext ThisIRC => this;
 
-            public RegistrationContext WhenAnyValueType()
+            public RegistrationContext WhenOnlyValueTypes()
+            {
+                ThisIRC.OnlyValueTypes = true;
+                return this;
+            }
+
+            public RegistrationContext WhenAnyValueType(IEnumerable<EnumValueTypes> except = null)
             {
                 ThisIRC.ValueType = uint.MaxValue;
+                if (except != null)
+                {
+                    foreach (var exceptValue in except)
+                    {
+                        if (exceptValue != EnumValueTypes.None)
+                        {
+                            ThisIRC.ValueType &= ~(1u << (int)exceptValue - 1);
+                        }
+                    }
+                }
                 return this;
             }
 

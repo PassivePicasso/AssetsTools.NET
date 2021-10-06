@@ -3,6 +3,7 @@ using AssetsExporter.Extensions;
 using AssetsExporter.YAML;
 using AssetsExporter.YAMLExporters.Info;
 using AssetsTools.NET;
+using AssetsTools.NET.Extra;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -39,12 +40,13 @@ namespace AssetsExporter.YAMLExporters
             var file = fileID == 0 ? context.SourceAsset.file : context.SourceAsset.file.GetDependency(context.AssetsManager, fileID - 1);
             var info = context.Info.GetOrAdd<PPtrExporterInfo>(nameof(PPtrExporterInfo));
 
-            if (field.GetName() == "m_Script")
+            var depInfo = context.AssetsManager.GetExtAsset(file, 0, pathID, true);
+            if ((AssetClassID)depInfo.info.curFileType == AssetClassID.MonoScript)
             {
                 var scriptsCache = info.scriptsCache.GetOrAdd(file);
                 if (!scriptsCache.TryGetValue(pathID, out var scriptRef))
                 {
-                    var scriptAsset = context.AssetsManager.GetExtAsset(context.SourceAsset.file, field);
+                    var scriptAsset = context.AssetsManager.GetExtAsset(file, 0, pathID);
                     var scriptBase = scriptAsset.instance.GetBaseField();
 
                     var className = scriptBase.Get("m_ClassName").GetValue().value.asString;

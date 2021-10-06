@@ -33,5 +33,15 @@ namespace AssetsExporter.Extensions
 
             return @default;
         }
+
+        public static TValue TryGet<TKey, TValue>(this Dictionary<TKey, TValue> dict, TKey key, TValue @default = default)
+        {
+            if (dict.TryGetValue(key, out var value))
+            {
+                return value;
+            }
+
+            return @default;
+        }
     }
 }

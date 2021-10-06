@@ -52,7 +52,7 @@ namespace AssetsExporter
             {
                 if (ignoreExporterTypes.Contains(exporter.ExporterType)) continue;
                 if (template.hasValue && ((1u << (int)template.valueType - 1) & exporter.ValueType) == 0) continue;
-                if (!template.hasValue && exporter.ValueType != 0) continue;
+                if (!template.hasValue && exporter.OnlyValueTypes) continue;
                 if (parentField != null)
                 {
                     if (!TypeMatch(exporter.ParentTypeNames, parentField.templateField.type, StringComparer)) continue;
@@ -101,7 +101,8 @@ namespace AssetsExporter
             return new YAMLExportManager()
                 .RegisterExporter<ValueTypeExporter>(x => x
                     .WithPriority(int.MaxValue)
-                    .WhenAnyValueType())
+                    .WhenAnyValueType(new[] { EnumValueTypes.Array, EnumValueTypes.ByteArray })
+                    .WhenOnlyValueTypes())
                 .RegisterExporter<MonoBehaviourExporter>(x => x
                     .WhenTypeName("MonoBehaviour"))
                 .RegisterExporter<PPtrExporter>(x => x
@@ -111,7 +112,8 @@ namespace AssetsExporter
                 .RegisterExporter<PairExporter>(x => x
                     .WhenTypeName("pair"))
                 .RegisterExporter<TypelessDataExporter>(x => x
-                    .WhenTypeName("TypelessData"))
+                    .WhenTypeName("TypelessData")
+                    .WhenValueType(EnumValueTypes.ByteArray))
                 .RegisterExporter<StreamingInfoExporter>(x => x
                     .WhenTypeName("StreamingInfo"))
                 .RegisterExporter<GUIDExporter>(x => x
@@ -119,7 +121,9 @@ namespace AssetsExporter
                 .RegisterExporter<ShaderEmptyDependenciesExporter>(x => x
                     .WhenTypeName("Shader"))
                 .RegisterExporter<GenericExporter>(x => x
-                    .WithPriority(int.MinValue));
+                    .WithPriority(int.MinValue)
+                    .WhenValueType(EnumValueTypes.Array)
+                    .WhenValueType(EnumValueTypes.ByteArray));
         }
     }
 }

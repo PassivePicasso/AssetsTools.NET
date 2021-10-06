@@ -9,14 +9,16 @@ namespace AssetsExporter.YAMLExporters
     {
         public YAMLNode Export(ExportContext context, AssetTypeValueField parentField, AssetTypeValueField field, bool raw = false)
         {
-            if (field.templateField.valueType != EnumValueTypes.None)
+            switch (field.templateField.valueType)
             {
-                throw new NotSupportedException("Value types are not supported for this exporter");
-            }
-
-            if (field.templateField.isArray)
-            {
-                return ExportHelpers.ExportArray(context, field);
+                case EnumValueTypes.Array:
+                    return ExportHelpers.ExportArray(context, field);
+                case EnumValueTypes.ByteArray:
+                    return field.GetValue().value.asByteArray.data.ExportYAML();
+                case EnumValueTypes.None:
+                    break;
+                default:
+                    throw new NotSupportedException("Value types are not supported for this exporter");
             }
 
             if (field.childrenCount == 1 && field.children[0].templateField.isArray)
@@ -32,7 +34,7 @@ namespace AssetsExporter.YAMLExporters
                     }
                     return node;
                 }
-                return ExportHelpers.ExportArray(context, field.children[0]);
+                return ExportHelpers.ExportArray(context, arrayChild);
             }
 
             if (field.childrenCount > 0)

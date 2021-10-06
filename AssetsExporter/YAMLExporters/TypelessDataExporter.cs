@@ -12,11 +12,11 @@ namespace AssetsExporter.YAMLExporters
     {
         public YAMLNode Export(ExportContext context, AssetTypeValueField parentField, AssetTypeValueField field, bool raw = false)
         {
-            var size = field.GetValue().value.asArray.size;
+            var size = field.GetValue().value.asByteArray.size;
             YAMLNode typelessDataNode = null;
             if (size > 0)
             {
-                typelessDataNode = context.Export(parentField, field, false, typeof(TypelessDataExporter));
+                typelessDataNode = field.GetValue().value.asByteArray.data.ExportYAML();
             }
             else
             {
@@ -27,7 +27,7 @@ namespace AssetsExporter.YAMLExporters
                 }
 
                 var offset = streamData.Get("offset").GetValue().value.asUInt32;
-                size = (int)streamData.Get("size").GetValue().value.asUInt32;
+                size = streamData.Get("size").GetValue().value.asUInt32;
                 if (size == 0)
                 {
                     goto exit;
@@ -48,7 +48,7 @@ namespace AssetsExporter.YAMLExporters
                 {
                     var bytes = new byte[size];
                     file.Position = offset;
-                    file.Read(bytes, 0, size);
+                    file.Read(bytes, 0, (int)size);
                     typelessDataNode = bytes.ExportYAML();
                 }
             }
