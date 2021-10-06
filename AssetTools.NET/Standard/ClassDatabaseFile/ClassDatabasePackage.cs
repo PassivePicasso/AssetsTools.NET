@@ -1,4 +1,5 @@
-﻿using AssetsTools.NET.Extra.Decompressors.LZ4;
+﻿using AssetsTools.NET.Extra;
+using AssetsTools.NET.Extra.Decompressors.LZ4;
 using SevenZip.Compression.LZMA;
 using System;
 using System.Collections.Generic;
@@ -126,13 +127,96 @@ namespace AssetsTools.NET
                 }
             }
             stringTable = newReader.ReadBytes((int)header.stringTableLenUncompressed);
-            for (int i = 0; i < header.fileCount; i++)
-            {
-                files[i].stringTable = stringTable;
-            }
 
             valid = true;
             return valid;
+        }
+
+        public void Write(AssetsFileWriter writer)
+        {
+            if (!valid)
+            {
+                throw new InvalidDataException("cldb is not valid");
+            }
+
+            var uncompressedFilesSize = 0L;
+            var compressedBytes = Net35Polyfill.ArrayEmpty<byte>();
+
+            using (var uncompressedStream = new MemoryStream())
+            using (var uncompressedWriter = new AssetsFileWriter(uncompressedStream))
+            {
+                uncompressedWriter.bigEndian = writer.bigEndian;
+                //the compression is handled by the cldbs themselves
+                for (int i = 0; i < header.fileCount; i++)
+                {
+                    var file = header.files[i];
+                    file.offset = (uint)uncompressedWriter.Position;
+                    using (var tempStream = new MemoryStream())
+                    using (var tempWriter = new AssetsFileWriter(tempStream))
+                    {
+                        tempWriter.bigEndian = writer.bigEndian;
+                        files[i].Write(tempWriter);
+                        uncompressedWriter.Write(tempStream.ToArray());
+                    }
+                    file.length = (uint)(uncompressedWriter.Position - file.offset);
+                    header.files[i] = file;
+                }
+                uncompressedFilesSize = uncompressedWriter.Position;
+
+                if ((header.compressionType & 0x20) != 0)
+                {
+                    compressedBytes = uncompressedStream.ToArray();
+                }
+                else if ((header.compressionType & 0x1f) == 2) //lzma
+                {
+                    using (var compressedStream = new MemoryStream())
+                    {
+                        uncompressedStream.Position = 0;
+                        SevenZipHelper.Compress(uncompressedStream, compressedStream);
+                        compressedBytes = compressedStream.ToArray();
+                    }
+                }
+                else
+                {
+                    throw new NotSupportedException("Only lzma compression is supported");
+                }
+            }
+
+            header.Write(writer);
+            writer.Write(compressedBytes);
+
+            if ((header.compressionType & 0x20) != 0) //not uncompressed
+            {
+                compressedBytes = stringTable;
+            }
+            else
+            {
+                if ((header.compressionType & 0x1f) == 2) //lzma
+                {
+                    using (var uncompressedStream = new MemoryStream(stringTable))
+                    using (var compressedStream = new MemoryStream())
+                    {
+                        uncompressedStream.Position = 0;
+                        SevenZipHelper.Compress(uncompressedStream, compressedStream);
+                        compressedBytes = compressedStream.ToArray();
+                    }
+                }
+                else
+                {
+                    throw new NotSupportedException("Only lzma compression is supported");
+                }
+            }
+
+            header.fileBlockSize = (uint)uncompressedFilesSize;
+            header.stringTableLenUncompressed = (uint)stringTable.Length;
+            header.stringTableOffset = (uint)writer.Position;
+            header.stringTableLenCompressed = (uint)compressedBytes.Length;
+
+            //compressedBytes is reused for stringTable
+            writer.Write(compressedBytes);
+
+            writer.Position = 0;
+            header.Write(writer);
         }
     }
 }

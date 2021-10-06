@@ -73,6 +73,7 @@ namespace AssetsTools.NET
                 {
                     valueType = EnumValueTypes.Array;
                 }
+                hasValue = true;
             }
 
             return true;
@@ -133,6 +134,7 @@ namespace AssetsTools.NET
                 {
                     valueType = EnumValueTypes.Array;
                 }
+                hasValue = true;
             }
 
             return true;

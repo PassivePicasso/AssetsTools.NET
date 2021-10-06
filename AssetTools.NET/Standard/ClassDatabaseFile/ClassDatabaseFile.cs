@@ -1,4 +1,5 @@
-﻿using AssetsTools.NET.Extra.Decompressors.LZ4;
+﻿using AssetsTools.NET.Extra;
+using AssetsTools.NET.Extra.Decompressors.LZ4;
 using SevenZip.Compression.LZMA;
 using System;
 using System.Collections.Generic;
@@ -76,21 +77,53 @@ namespace AssetsTools.NET
 
         public void Write(AssetsFileWriter writer)
         {
-            header.Write(writer);
-            writer.Write(classes.Count);
-            for (int i = 0; i < classes.Count; i++)
+            if (!valid)
             {
-                classes[i].Write(writer, header.fileVersion, header.flags);
+                throw new InvalidDataException("cldb is not valid");
             }
-            long stringTablePos = writer.Position;
-            writer.Write(stringTable);
-            long stringTableLen = writer.Position - stringTablePos;
-            long fileSize = writer.Position;
+
+            var stringTablePos = 0L;
+            var uncompressedSize = 0L;
+            var compressedBytes = Net35Polyfill.ArrayEmpty<byte>();
+
+            using (var uncompressedStream = new MemoryStream())
+            using (var uncompressedWriter = new AssetsFileWriter(uncompressedStream))
+            {
+                uncompressedWriter.bigEndian = writer.bigEndian;
+                uncompressedWriter.Write(classes.Count);
+                for (int i = 0; i < classes.Count; i++)
+                {
+                    classes[i].Write(uncompressedWriter, header.fileVersion, header.flags);
+                }
+                stringTablePos = uncompressedWriter.Position;
+                uncompressedWriter.Write(stringTable);
+                uncompressedSize = uncompressedWriter.Position;
+
+                switch (header.compressionType)
+                {
+                    case 0:
+                        compressedBytes = uncompressedStream.ToArray();
+                        break;
+                    case 2:
+                        using (var compressedStream = new MemoryStream())
+                        {
+                            uncompressedStream.Position = 0;
+                            SevenZipHelper.Compress(uncompressedStream, compressedStream);
+                            compressedBytes = compressedStream.ToArray();
+                        }
+                        break;
+                    default:
+                        throw new NotSupportedException("Only lzma (2) compression is supported, or no compression at all (0)");
+                }
+            }
+            
             header.stringTablePos = (uint)stringTablePos;
-            header.stringTableLen = (uint)stringTableLen;
-            header.uncompressedSize = (uint)fileSize;
-            writer.Position = 0;
+            header.stringTableLen = (uint)(uncompressedSize - stringTablePos);
+            header.uncompressedSize = (uint)uncompressedSize;
+            header.compressedSize = (uint)compressedBytes.Length;
+
             header.Write(writer);
+            writer.Write(compressedBytes);
         }
 
         public bool IsValid()

@@ -56,14 +56,13 @@ namespace AssetsTools.NET
         public void Write(AssetsFileWriter writer)
         {
             writer.bigEndian = false;
-            writer.Write(Encoding.ASCII.GetBytes(header));
+            writer.Write(Encoding.ASCII.GetBytes(header), 0, 4);
             writer.Write(fileVersion);
             if (fileVersion == 4)
                 writer.Write(flags);
             switch (fileVersion)
             {
                 case 1:
-                    writer.Write((byte)0);
                     break;
                 case 2:
                     writer.Write(compressionType);

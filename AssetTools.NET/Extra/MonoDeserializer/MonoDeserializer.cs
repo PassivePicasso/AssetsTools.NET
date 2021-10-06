@@ -5,6 +5,7 @@
 //   You've been warned!    
 
 using Mono.Cecil;
+using Mono.Collections.Generic;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -18,6 +19,7 @@ namespace AssetsTools.NET.Extra
         public int childrenCount;
         public List<AssetTypeTemplateField> children;
         private static Dictionary<string, AssemblyDefinition> loadedAssemblies = new Dictionary<string, AssemblyDefinition>();
+
         public void Read(string typeName, AssemblyDefinition assembly, uint format)
         {
             this.format = format;
@@ -25,11 +27,13 @@ namespace AssetsTools.NET.Extra
             RecursiveTypeLoad(assembly.MainModule, typeName, children);
             childrenCount = children.Count;
         }
+
         public void Read(string typeName, string assemblyPath, uint format)
         {
             AssemblyDefinition asmDef = GetAssemblyWithDependencies(assemblyPath);
             Read(typeName, asmDef, format);
         }
+
         public static AssemblyDefinition GetAssemblyWithDependencies(string path)
         {
             DefaultAssemblyResolver resolver = new DefaultAssemblyResolver();
@@ -40,6 +44,7 @@ namespace AssetsTools.NET.Extra
             };
             return AssemblyDefinition.ReadAssembly(File.Open(path, FileMode.Open, FileAccess.Read, FileShare.Read), readerParameters);
         }
+
         public static AssetTypeValueField GetMonoBaseField(AssetsManager am, AssetsFileInstance inst, AssetFileInfoEx info, string managedPath, bool cached = true)
         {
             AssetsFile file = inst.file;
@@ -87,12 +92,14 @@ namespace AssetsTools.NET.Extra
             }
             return mainAti.GetBaseField();
         }
+
         private void RecursiveTypeLoad(ModuleDefinition module, string typeName, List<AssetTypeTemplateField> attf)
         {
             TypeDefinition type = module.GetTypes().First(t => t.FullName.Equals(typeName));
             RecursiveTypeLoad(type, attf);
         }
-        private void RecursiveTypeLoad(TypeDefinition type, List<AssetTypeTemplateField> attf)
+
+        private void RecursiveTypeLoad(TypeDefinition type, List<AssetTypeTemplateField> attf, Collection<TypeReference> genericArgs = null)
         {
             string baseName = type.BaseType.FullName;
             if (baseName != "System.Object" &&
@@ -101,23 +108,33 @@ namespace AssetsTools.NET.Extra
                 baseName != "UnityEngine.ScriptableObject")
             {
                 TypeDefinition typeDef = type.BaseType.Resolve();
-                RecursiveTypeLoad(typeDef, attf);
+                var baseGenericArgs = (type.BaseType as GenericInstanceType)?.GenericArguments;
+                RecursiveTypeLoad(typeDef, attf, baseGenericArgs);
             }
 
-            attf.AddRange(ReadTypes(type));
+            attf.AddRange(ReadTypes(type, genericArgs));
         }
-        private List<AssetTypeTemplateField> ReadTypes(TypeDefinition type)
+
+        private List<AssetTypeTemplateField> ReadTypes(TypeDefinition type, Collection<TypeReference> genericArgs)
         {
-            List<FieldDefinition> acceptableFields = GetAcceptableFields(type);
-            List<AssetTypeTemplateField> localChildren = new List<AssetTypeTemplateField>();
+            var genericTypes = new Dictionary<string, TypeDefinition>();
+            for (var i = 0; i < type.GenericParameters.Count; i++)
+            {
+                genericTypes[type.GenericParameters[i].FullName] = genericArgs[i].Resolve();
+            }
+            var acceptableFields = GetAcceptableFields(type, genericTypes);
+            var localChildren = new List<AssetTypeTemplateField>();
             for (int i = 0; i < acceptableFields.Count; i++)
             {
-                AssetTypeTemplateField field = new AssetTypeTemplateField();
-                FieldDefinition fieldDef = acceptableFields[i];
-                TypeReference fieldTypeRef = fieldDef.FieldType;
-                TypeDefinition fieldType = fieldTypeRef.Resolve();
-                string fieldTypeName = fieldType.Name;
-                bool isArrayOrList = false;
+                var field = new AssetTypeTemplateField();
+                var fieldDef = acceptableFields[i];
+                var fieldTypeRef = fieldDef.FieldType;
+                if (!fieldTypeRef.IsGenericParameter || !genericTypes.TryGetValue(fieldTypeRef.FullName, out var fieldType))
+                {
+                    fieldType = fieldTypeRef.Resolve();
+                }
+                var fieldTypeName = fieldType.Name;
+                var isArrayOrList = false;
 
                 if (fieldTypeRef.MetadataType == MetadataType.Array)
                 {
@@ -152,7 +169,8 @@ namespace AssetsTools.NET.Extra
                 }
                 else if (fieldType.IsSerializable)
                 {
-                    SetSerialized(field, fieldType);
+                    var fieldGenerics = (fieldTypeRef as GenericInstanceType)?.GenericArguments;
+                    SetSerialized(field, fieldType, fieldGenerics);
                 }
 
                 if (fieldType.IsEnum)
@@ -175,9 +193,10 @@ namespace AssetsTools.NET.Extra
             return localChildren;
         }
 
-        private List<FieldDefinition> GetAcceptableFields(TypeDefinition typeDef)
+        private List<FieldDefinition> GetAcceptableFields(TypeDefinition typeDef, Dictionary<string, TypeDefinition> genericTypes)
         {
-            List<FieldDefinition> validFields = new List<FieldDefinition>();
+            var validFields = new List<FieldDefinition>();
+
             foreach (FieldDefinition f in typeDef.Fields)
             {
                 if (!HasFlag(f.Attributes, FieldAttributes.Public) &&
@@ -195,7 +214,7 @@ namespace AssetsTools.NET.Extra
                 }
 
                 //Unity can't serialize collection of collections, ignorig them
-                TypeReference ft = f.FieldType;
+                var ft = f.FieldType;
                 if (f.FieldType.IsArray)
                 {
                     ft = ft.GetElementType();
@@ -212,8 +231,12 @@ namespace AssetsTools.NET.Extra
                         continue;
                     }
                 }
-                TypeDefinition ftd = ft.Resolve();
-                
+
+                if (!ft.IsGenericParameter || !genericTypes.TryGetValue(ft.FullName, out var ftd))
+                {
+                    ftd = ft.Resolve();
+                }
+
                 if (ftd != null && IsValidDef(ftd))
                 {
                     validFields.Add(f);
@@ -236,6 +259,7 @@ namespace AssetsTools.NET.Extra
                        IsSpecialUnityType(def);
             }
         }
+
         private Dictionary<string, string> baseToPrimitive = new Dictionary<string, string>()
         {
             {"Boolean","bool"},
@@ -252,6 +276,7 @@ namespace AssetsTools.NET.Extra
             {"Int32","int"},
             {"String","string"}
         };
+
         private string ConvertBaseToPrimitive(string name)
         {
             if (baseToPrimitive.ContainsKey(name))
@@ -260,6 +285,7 @@ namespace AssetsTools.NET.Extra
             }
             return name;
         }
+
         private bool IsPrimitiveType(TypeDefinition typeDef)
         {
             string name = typeDef.FullName;
@@ -349,7 +375,7 @@ namespace AssetsTools.NET.Extra
             array.valueType = field.valueType == EnumValueTypes.UInt8 ? EnumValueTypes.ByteArray : EnumValueTypes.Array;
             array.isArray = true;
             array.align = true;
-            array.hasValue = false;
+            array.hasValue = true;
             array.childrenCount = 2;
             array.children = new AssetTypeTemplateField[] {
                 size, data
@@ -388,7 +414,7 @@ namespace AssetsTools.NET.Extra
             array.valueType = EnumValueTypes.ByteArray;
             array.isArray = true;
             array.align = true;
-            array.hasValue = false;
+            array.hasValue = true;
             array.childrenCount = 2;
             array.children = new AssetTypeTemplateField[] {
                 size, data
@@ -439,10 +465,10 @@ namespace AssetsTools.NET.Extra
             };
         }
 
-        private void SetSerialized(AssetTypeTemplateField field, TypeDefinition type)
+        private void SetSerialized(AssetTypeTemplateField field, TypeDefinition type, Collection<TypeReference> genericArgs = null)
         {
             List<AssetTypeTemplateField> types = new List<AssetTypeTemplateField>();
-            RecursiveTypeLoad(type, types);
+            RecursiveTypeLoad(type, types, genericArgs);
             field.childrenCount = types.Count;
             field.children = types.ToArray();
         }

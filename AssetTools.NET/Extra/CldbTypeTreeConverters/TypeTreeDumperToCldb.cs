@@ -8,20 +8,17 @@ namespace AssetsTools.NET.Extra.CldbTypeTreeConverters
 {
     public static class TypeTreeDumperToCldb
     {
-        public static ClassDatabaseFile ParseDump(string dumpFolder)
+        public static ClassDatabaseFile ParseDump(string structsPath, string stringsPath, bool addMinorVersionWildcard = false)
         {
-            var stringsPath = Path.Combine(dumpFolder, "strings.dat");
-            if (!File.Exists(stringsPath))
+            if (!string.IsNullOrEmpty(stringsPath) && !File.Exists(stringsPath))
             {
-                throw new ArgumentException("Couldn't find \"strings.dat\" file");
+                throw new ArgumentException($"Couldn't find \"{Path.GetFileName(stringsPath)}\" file");
             }
-            var structsPath = Path.Combine(dumpFolder, "structs.dat");
             if (!File.Exists(structsPath))
             {
-                throw new ArgumentException("Couldn't find \"structs.dat\" file");
+                throw new ArgumentException($"Couldn't find \"{Path.GetFileName(structsPath)}\" file");
             }
-
-            var commonStrings = Encoding.UTF8.GetString(File.ReadAllBytes(stringsPath));
+            var commonStrings = string.IsNullOrEmpty(stringsPath) ? "" : Encoding.UTF8.GetString(File.ReadAllBytes(stringsPath));
             using (var file = File.OpenRead(structsPath))
             using (var reader = new AssetsFileReader(file))
             {
@@ -39,10 +36,8 @@ namespace AssetsTools.NET.Extra.CldbTypeTreeConverters
                     stringTable = Encoding.UTF8.GetBytes(NormalizeStringsInTypes(types, localStrings, commonStrings)),
                     header = new ClassDatabaseFileHeader
                     {
-                        unityVersionCount = 2,
-                        //There shouldn't be any changes for TypeTree between patch versions
-                        //so adding wildcard for minor versions e.g "2020.1.*"
-                        unityVersions = new[] { unityVersion, Regex.Replace(unityVersion, @"(\d+?\.\d+?\.)(\d+?\w\d+)", "$1*") },
+                        unityVersionCount = (byte)(addMinorVersionWildcard ? 2 : 1),
+                        unityVersions = addMinorVersionWildcard ? new[] { unityVersion, Regex.Replace(unityVersion, @"(\d+?\.\d+?\.)(\d+?\w\d+)", "$1*") } : new[] { unityVersion },
                         header = "cldb",
                         fileVersion = 4,
                         flags = 0,
