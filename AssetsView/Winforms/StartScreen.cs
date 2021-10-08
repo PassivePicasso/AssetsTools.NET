@@ -152,7 +152,8 @@ namespace AssetsView.Winforms
             {
                 inst.table.GenerateQuickLookupTree();
                 helper.UpdateDependencies();
-                helper.LoadClassDatabaseFromPackage(inst.file.typeTree.unityVersion);
+                var version = new UnityVersion(inst.file.typeTree.unityVersion);
+                helper.LoadClassDatabaseFromPackage(version);
                 if (helper.classFile == null)
                 {
                     //may still not work but better than nothing I guess
@@ -184,9 +185,9 @@ namespace AssetsView.Winforms
                     LoadGeneric(inst, false);
                 }
 
-                string[] vers = helper.classFile.header.unityVersions;
-                string corVer = vers.FirstOrDefault(v => !v.Contains("*"));
-                Text = "AssetsView .NET - ver " + inst.file.typeTree.unityVersion + " / db " + corVer;
+                var vers = helper.classFile.header.unityVersions;
+                var corVer = vers.Reverse().FirstOrDefault(v => v < version);
+                Text = $"AssetsView .NET - ver {version} / db {corVer}";
             }
         }
 

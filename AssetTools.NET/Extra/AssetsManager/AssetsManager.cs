@@ -454,58 +454,64 @@ namespace AssetsTools.NET.Extra
         #endregion
 
         #region class database
-        public ClassDatabaseFile LoadClassDatabase(Stream stream)
+        public ClassDatabaseFile LoadClassDatabase(Stream stream, bool parseBody = true)
         {
             classFile = new ClassDatabaseFile();
-            classFile.Read(new AssetsFileReader(stream));
+            classFile.ReadHeader(new AssetsFileReader(stream));
+            if (parseBody)
+            {
+                classFile.ParseBody();
+            }
             return classFile;
         }
 
-        public ClassDatabaseFile LoadClassDatabase(string path)
+        public ClassDatabaseFile LoadClassDatabase(string path, bool parseBody = true)
         {
-            return LoadClassDatabase(File.OpenRead(path));
+            using (var file = File.OpenRead(path))
+            {
+                return LoadClassDatabase(file, parseBody);
+            }
         }
 
-        public ClassDatabaseFile LoadClassDatabaseFromPackage(string version, bool specific = false)
+        public ClassDatabaseFile LoadClassDatabaseFromPackage(string version, bool specific = false) => LoadClassDatabaseFromPackage(new UnityVersion(version), specific);
+
+        public ClassDatabaseFile LoadClassDatabaseFromPackage(UnityVersion version, bool specific = false)
         {
             if (classPackage == null)
+            {
                 throw new Exception("No class package loaded!");
-
-            if (specific)
-            {
-                if (!version.StartsWith("U"))
-                    version = "U" + version;
-                int index = classPackage.header.files.FindIndex(f => f.name == version);
-                if (index == -1)
-                    return null;
-
-                classFile = classPackage.files[index];
-                return classFile;
             }
-            else
+
+            ClassDatabaseFile lastFile = null;
+            for (int i = 0; i < classPackage.files.Length; i++)
             {
-                if (version.StartsWith("U"))
-                    version = version.Substring(1);
-                for (int i = 0; i < classPackage.files.Length; i++)
+                var file = classPackage.files[i];
+                for (int j = 0; j < file.header.unityVersions.Length; j++)
                 {
-                    ClassDatabaseFile file = classPackage.files[i];
-                    for (int j = 0; j < file.header.unityVersions.Length; j++)
+                    var unityVersion = file.header.unityVersions[j];
+                    if (version == unityVersion)
                     {
-                        string unityVersion = file.header.unityVersions[j];
-                        if (WildcardMatches(version, unityVersion))
+                        file.ParseBody();
+                        return classFile = file;
+                    }
+                    if (!specific && version < unityVersion)
+                    {
+                        if (lastFile != null)
                         {
-                            classFile = file;
-                            return classFile;
+                            lastFile.ParseBody();
+                            return classFile = lastFile;
                         }
+                        if (j == 0)
+                        {
+                            return null;
+                        }
+                        file.ParseBody();
+                        return classFile = file;
                     }
                 }
-                return null;
+                lastFile = file;
             }
-
-        }
-        private bool WildcardMatches(string test, string pattern)
-        {
-            return Regex.IsMatch(test, "^" + Regex.Escape(pattern).Replace("\\*", ".*") + "$");
+            return null;
         }
 
         public ClassDatabasePackage LoadClassPackage(Stream stream)
@@ -514,6 +520,7 @@ namespace AssetsTools.NET.Extra
             classPackage.Read(new AssetsFileReader(stream));
             return classPackage;
         }
+
         public ClassDatabasePackage LoadClassPackage(string path)
         {
             return LoadClassPackage(File.OpenRead(path));

@@ -36,7 +36,7 @@ namespace AssetsTools.NET
                     using (AssetsFileReader r = new AssetsFileReader(ms))
                     {
                         files[i] = new ClassDatabaseFile();
-                        files[i].Read(r);
+                        files[i].ReadHeader(r);
                     }
                 }
             }
@@ -84,7 +84,7 @@ namespace AssetsTools.NET
                     using (AssetsFileReader r = new AssetsFileReader(ms))
                     {
                         files[i] = new ClassDatabaseFile();
-                        files[i].Read(r);
+                        files[i].ReadHeader(r);
                     }
                 }
             }

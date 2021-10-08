@@ -13,7 +13,7 @@ namespace AssetsTools.NET
         public uint compressedSize, uncompressedSize;
 
         public byte unityVersionCount;
-        public string[] unityVersions;
+        public UnityVersion[] unityVersions;
         
         public uint stringTableLen;
         public uint stringTablePos;
@@ -45,10 +45,10 @@ namespace AssetsTools.NET
                     return;
             }
             unityVersionCount = reader.ReadByte();
-            unityVersions = new string[unityVersionCount];
+            unityVersions = new UnityVersion[unityVersionCount];
             for (int i = 0; i < unityVersionCount; i++)
             {
-                unityVersions[i] = reader.ReadCountString();
+                unityVersions[i] = new UnityVersion(reader.ReadCountString());
             }
             stringTableLen = reader.ReadUInt32();
             stringTablePos = reader.ReadUInt32();
@@ -79,7 +79,7 @@ namespace AssetsTools.NET
             writer.Write(unityVersionCount);
             for (int i = 0; i < unityVersionCount; i++)
             {
-                writer.WriteCountString(unityVersions[i]);
+                writer.WriteCountString(unityVersions[i].ToString());
             }
             writer.Write(stringTableLen);
             writer.Write(stringTablePos);

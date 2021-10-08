@@ -2,13 +2,12 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
-using System.Text.RegularExpressions;
 
 namespace AssetsTools.NET.Extra.CldbTypeTreeConverters
 {
     public static class TypeTreeDumperToCldb
     {
-        public static ClassDatabaseFile ParseDump(string structsPath, string stringsPath, bool addMinorVersionWildcard = false)
+        public static ClassDatabaseFile ParseDump(string structsPath, string stringsPath)
         {
             if (!string.IsNullOrEmpty(stringsPath) && !File.Exists(stringsPath))
             {
@@ -36,8 +35,8 @@ namespace AssetsTools.NET.Extra.CldbTypeTreeConverters
                     stringTable = Encoding.UTF8.GetBytes(NormalizeStringsInTypes(types, localStrings, commonStrings)),
                     header = new ClassDatabaseFileHeader
                     {
-                        unityVersionCount = (byte)(addMinorVersionWildcard ? 2 : 1),
-                        unityVersions = addMinorVersionWildcard ? new[] { unityVersion, Regex.Replace(unityVersion, @"(\d+?\.\d+?\.)(\d+?\w\d+)", "$1*") } : new[] { unityVersion },
+                        unityVersionCount = 1,
+                        unityVersions = new[] { new UnityVersion(unityVersion) },
                         header = "cldb",
                         fileVersion = 4,
                         flags = 0,
