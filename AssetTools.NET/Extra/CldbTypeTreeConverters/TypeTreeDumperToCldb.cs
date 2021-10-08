@@ -42,6 +42,7 @@ namespace AssetsTools.NET.Extra.CldbTypeTreeConverters
                         flags = 0,
                     },
                     valid = true,
+                    bodyParsed = true,
                 };
             }
         }
