@@ -12,5 +12,6 @@ namespace AssetsExporter.YAMLExporters.Info
         public readonly Dictionary<AssetsFileInstance, Dictionary<long, KeyValuePair<long, Guid>>> scriptsCache = new Dictionary<AssetsFileInstance, Dictionary<long, KeyValuePair<long, Guid>>>();
         public readonly Dictionary<string, Guid> unityExtensionAssebmlies = new Dictionary<string, Guid>();
         public readonly List<BaseAssetCollection> foundNewCollections = new List<BaseAssetCollection>();
+        public bool storeFoundCollections;
     }
 }

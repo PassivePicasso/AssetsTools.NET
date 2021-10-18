@@ -52,7 +52,10 @@ namespace AssetsExporter
 
         private GameExporter(string pathToExecutable, string outputDirectory, string editorPath)
         {
-            pptrExporterInfo = new PPtrExporterInfo();
+            pptrExporterInfo = new PPtrExporterInfo
+            {
+                storeFoundCollections = true,
+            };
             exporterInfo = new Dictionary<string, object>
             {
                 [nameof(PPtrExporterInfo)] = pptrExporterInfo,

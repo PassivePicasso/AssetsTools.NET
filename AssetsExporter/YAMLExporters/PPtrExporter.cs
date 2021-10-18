@@ -78,7 +78,10 @@ namespace AssetsExporter.YAMLExporters
             if (!assetToRootAsset.TryGetValue(pathID, out var rootPathID))
             {
                 var dependencyCollection = AssetCollection.CreateAssetCollection(context.AssetsManager, context.AssetsManager.GetExtAsset(file, 0, pathID));
-                info.foundNewCollections.Add(dependencyCollection);
+                if (info.storeFoundCollections)
+                {
+                    info.foundNewCollections.Add(dependencyCollection);
+                }
                 rootPathID = dependencyCollection.MainAsset.Value.info.index;
                 foreach (var cAsset in dependencyCollection.Assets)
                 {
