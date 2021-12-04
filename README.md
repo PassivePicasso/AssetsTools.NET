@@ -279,7 +279,8 @@ var assetInst = am.LoadAssetsFileFromBundle(bun, 0, true);
 
 If you want data files in the bundle like .resS or .resource, use `BundleHelper.LoadAssetDataFromBundle()` to get a byte array of that file.
 
-If you want to read the files listing in a bundle but don't want to decompress the entire file yet, use `BundleHelper.UnpackInfoOnly()` to decompress only the file listing info block. Make sure to call `am.LoadBundleFile()` with `unpackIfPacked` set to false.
+If you want to read the files listing in a bundle but don't want to decompress the entire file yet, use `BundleHelper.Un
+InfoOnly()` to decompress only the file listing info block. Make sure to call `am.LoadBundleFile()` with `unpackIfPacked` set to false.
 
 #### Notes
 
@@ -348,7 +349,7 @@ var bun = am.LoadBundleFile("uncompressedbundle.unity3d");
 using (var stream = File.OpenWrite("compressedbundle.unity3d"))
 using (var writer = new AssetsFileWriter(stream))
 {
-    bun.Pack(bun.reader, writer, AssetBundleCompressionType.LZMA);
+    bun.file.Pack(bun.file.reader, writer, AssetBundleCompressionType.LZMA);
 }
 ```
 
