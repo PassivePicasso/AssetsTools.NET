@@ -201,7 +201,7 @@ var repl = new AssetsReplacerFromMemory(0, inf.index, (int)inf.curFileType, 0xff
 using (var stream = File.OpenWrite("resources-modified.assets"))
 using (var writer = new AssetsFileWriter(stream))
 {
-	inst.file.Write(writer, 0, new List<AssetsReplacer>() { repl }, 0);
+    inst.file.Write(writer, 0, new List<AssetsReplacer>() { repl }, 0);
 }
 
 am.UnloadAllAssetsFiles();
