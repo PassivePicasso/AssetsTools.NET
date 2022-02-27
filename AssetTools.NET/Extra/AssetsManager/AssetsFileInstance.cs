@@ -8,7 +8,6 @@ namespace AssetsTools.NET.Extra
 {
     public class AssetsFileInstance
     {
-        public Stream stream;
         public string path;
         public string name;
         public AssetsFile file;
@@ -18,9 +17,10 @@ namespace AssetsTools.NET.Extra
         //for monobehaviours
         public Dictionary<uint, string> monoIdToName = new Dictionary<uint, string>();
 
+        public Stream AssetsStream => file.readerPar;
+
         public AssetsFileInstance(Stream stream, string filePath, string root)
         {
-            this.stream = stream;
             path = Path.GetFullPath(filePath);
             name = Path.Combine(root, Path.GetFileName(path));
             file = new AssetsFile(new AssetsFileReader(stream));
@@ -32,7 +32,6 @@ namespace AssetsTools.NET.Extra
         }
         public AssetsFileInstance(FileStream stream, string root)
         {
-            this.stream = stream;
             path = stream.Name;
             name = Path.Combine(root, Path.GetFileName(path));
             file = new AssetsFile(new AssetsFileReader(stream));
@@ -48,6 +47,12 @@ namespace AssetsTools.NET.Extra
             if (dependencies[depIdx] == null)
             {
                 string depPath = file.dependencies.dependencies[depIdx].assetPath;
+
+                if (depPath == string.Empty)
+                {
+                    return null;
+                }
+
                 int instIndex = am.files.FindIndex(f => Path.GetFileName(f.path).ToLower() == Path.GetFileName(depPath).ToLower());
                 if (instIndex == -1)
                 {
