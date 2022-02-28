@@ -446,7 +446,7 @@ namespace AssetsTools.NET.Extra
             }
             else
             {
-                AssetTypeValueField baseValueField = MonoDeserializer.GetMonoBaseField(this, inst, info, managedPath);
+                AssetTypeValueField baseValueField = NetDeserializer.GetMonoBaseField(this, inst, info, managedPath);
                 monoTemplateFieldCache[scriptName] = baseValueField.templateField;
                 return baseValueField;
             }

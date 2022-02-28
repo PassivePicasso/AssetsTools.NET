@@ -50,7 +50,7 @@ namespace AssetsExporter
         private readonly Dictionary<AssetsFileInstance, Dictionary<long, string>> fileAssetIdToPath;
         private readonly Dictionary<AssetsFileInstance, string> fileToOutputPath;
 
-        private GameExporter(string pathToExecutable, string outputDirectory, string editorPath)
+        private GameExporter(string pathToExecutable, string outputDirectory, string editorPath, string classDataPath)
         {
             pptrExporterInfo = new PPtrExporterInfo();
             exporterInfo = new Dictionary<string, object>
@@ -62,7 +62,7 @@ namespace AssetsExporter
 
             exportManager = YAMLExportManager.CreateDefault();
             assetsManager = new AssetsManager();
-            assetsManager.LoadClassPackage("classdata.tpk");
+            assetsManager.LoadClassPackage(classDataPath);
 
             this.editorPath = editorPath;
             this.outputDirectory = outputDirectory;
@@ -72,11 +72,27 @@ namespace AssetsExporter
             outputAssetsPathDirectory = Path.Combine(outputDirectory, "Assets");
         }
 
-        public static void ExportGame(string pathToExecutable, string outputDirectory, string editorPath)
+        public static void ExportGame(string pathToExecutable, string outputDirectory, string editorPath, string classDataPath)
         {
-            using (var exporter = new GameExporter(pathToExecutable, outputDirectory, editorPath))
+            using (var exporter = new GameExporter(pathToExecutable, outputDirectory, editorPath, classDataPath))
             {
                 exporter.Export();
+            }
+        }
+
+        public static void ExportGlobalGameManagers(string pathToExecutable, string outputDirectory, string editorPath, string classDataPath, string unityVersion)
+        {
+            using (var exporter = new GameExporter(pathToExecutable, outputDirectory, editorPath, classDataPath))
+            {
+                Directory.CreateDirectory(exporter.outputProjectSettingsDirectory);
+                Directory.CreateDirectory(exporter.outputAssetsPathDirectory);
+
+                exporter.ReadEditorExtensionAssemblies();
+
+                var globalGameManagersFile = exporter.assetsManager.LoadAssetsFile(Path.Combine(exporter.dataFolder, "globalgamemanagers"), true);
+                exporter.assetsManager.LoadClassDatabaseFromPackage(unityVersion);
+
+                exporter.ExportGlobalGameManagers(globalGameManagersFile, out var buildSettings);
             }
         }
 

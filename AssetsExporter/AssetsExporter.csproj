@@ -8,4 +8,8 @@
     <ProjectReference Include="..\AssetTools.NET\AssetsTools.NET.csproj" />
   </ItemGroup>
 
+  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+    <Exec Command="copy /Y $(TargetDir)*.dll E:\Projects\ThunderKit_Development\com.passivepicasso.thunderkit\Editor\ThirdParty\AssetsTools.NET\*.dll&#xD;&#xA;copy /Y $(TargetDir)*.pdb E:\Projects\ThunderKit_Development\com.passivepicasso.thunderkit\Editor\ThirdParty\AssetsTools.NET\*.pdb&#xD;&#xA;" />
+  </Target>
+
 </Project>
