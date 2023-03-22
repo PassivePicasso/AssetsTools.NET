@@ -52,7 +52,10 @@ namespace AssetsExporter
 
         private GameExporter(string pathToExecutable, string outputDirectory, string editorPath)
         {
-            pptrExporterInfo = new PPtrExporterInfo();
+            pptrExporterInfo = new PPtrExporterInfo
+            {
+                storeFoundCollections = true,
+            };
             exporterInfo = new Dictionary<string, object>
             {
                 [nameof(PPtrExporterInfo)] = pptrExporterInfo,
@@ -70,6 +73,8 @@ namespace AssetsExporter
             dataFolder = Path.Combine(Path.GetDirectoryName(pathToExecutable), $"{gameName}_Data");
             outputProjectSettingsDirectory = Path.Combine(outputDirectory, "ProjectSettings");
             outputAssetsPathDirectory = Path.Combine(outputDirectory, "Assets");
+
+            assetsManager.MonoTempGenerator = new MonoCecilTempGenerator(Path.Combine(dataFolder, $"Managed"));
         }
 
         public static void ExportGame(string pathToExecutable, string outputDirectory, string editorPath)
@@ -88,25 +93,29 @@ namespace AssetsExporter
             ReadEditorExtensionAssemblies();
 
             var globalGameManagersFile = assetsManager.LoadAssetsFile(Path.Combine(dataFolder, "globalgamemanagers"), true);
-            assetsManager.LoadClassDatabaseFromPackage(globalGameManagersFile.file.typeTree.unityVersion);
+            var unityVersion = new UnityVersion(globalGameManagersFile.file.Metadata.UnityVersion);
+            assetsManager.LoadClassDatabaseFromPackage(unityVersion);
+            assetsManager.UseTemplateFieldCache = true;
+            assetsManager.UseMonoTemplateFieldCache = true;
+            assetsManager.UseRefTypeManagerCache = true;
 
-            ExportGlobalGameManagers(globalGameManagersFile, out var buildSettings);
+            ExportGlobalGameManagers(globalGameManagersFile, unityVersion, out var buildSettings);
 
             //Preload all asset files and set their outputPath 
-            var resourceManager = assetsManager.GetExtAsset(globalGameManagersFile, 0, globalGameManagersFile.table.GetAssetsOfType((int)AssetClassID.ResourceManager).First().index);
-            var container = resourceManager.instance.GetBaseField().Get("m_Container").Get("Array");
-            var resourceFile = container.childrenCount == 0 ? null : assetsManager.LoadAssetsFile(Path.Combine(dataFolder, "resources.assets"), true);
+            var resourceManager = assetsManager.GetExtAsset(globalGameManagersFile, 0, globalGameManagersFile.file.GetAssetsOfType(AssetClassID.ResourceManager).First().PathId);
+            var container = resourceManager.baseField.Get("m_Container").Get("Array");
+            var resourceFile = container.Children.Count == 0 ? null : assetsManager.LoadAssetsFile(Path.Combine(dataFolder, "resources.assets"), true);
             if (resourceFile != null)
             {
                 var outputResourcesPath = Path.Combine(outputAssetsPathDirectory, "Resources");
                 fileToOutputPath[resourceFile] = outputResourcesPath;
             }
 
-            var scenes = buildSettings.instance.GetBaseField().Get("scenes")[0];
-            var sharedAssetsFiles = new AssetsFileInstance[scenes.childrenCount];
-            var levelFiles = new AssetsFileInstance[scenes.childrenCount];
+            var scenes = buildSettings.baseField.Get("scenes")[0];
+            var sharedAssetsFiles = new AssetsFileInstance[scenes.Children.Count];
+            var levelFiles = new AssetsFileInstance[scenes.Children.Count];
 
-            for (var i = 0; i < scenes.childrenCount; i++)
+            for (var i = 0; i < scenes.Children.Count; i++)
             {
                 sharedAssetsFiles[i] = assetsManager.LoadAssetsFile(Path.Combine(dataFolder, $"sharedassets{i}.assets"), true);
                 fileToOutputPath[sharedAssetsFiles[i]] = outputAssetsPathDirectory;
@@ -117,18 +126,18 @@ namespace AssetsExporter
             //Exporting all assets, starting from resources, then each scene sharedAssets => level
             if (resourceFile != null)
             {
-                fileAssetIdToPath[resourceFile] = container.children.ToDictionary(
-                    el => el.Get("second").GetLastChild().GetValue().AsInt64(),
-                    el => el.Get("first").GetValue().AsString());
-                ExportAllAssets(resourceFile);
+                fileAssetIdToPath[resourceFile] = container.Children.ToDictionary(
+                    el => el.Get("second").Get("m_PathID").AsLong,
+                    el => el.Get("first").AsString);
+                ExportAllAssets(resourceFile, unityVersion);
             }
 
-            for (var i = 0; i < scenes.childrenCount; i++)
+            for (var i = 0; i < scenes.Children.Count; i++)
             {
-                ExportAllAssets(sharedAssetsFiles[i]);
+                ExportAllAssets(sharedAssetsFiles[i], unityVersion);
             
-                var sceneAssetPath = scenes[i].value.value.asString;
-                ExportLevel(levelFiles[i], sceneAssetPath);
+                var sceneAssetPath = scenes[i].AsString;
+                ExportLevel(levelFiles[i], sceneAssetPath, unityVersion);
             }
 
             CreateAssetsSubDirectoriesMeta();
@@ -151,16 +160,21 @@ namespace AssetsExporter
             }
         }
 
-        private void ExportLevel(AssetsFileInstance levelFile, string sceneAssetPath)
+        private void ExportLevel(AssetsFileInstance levelFile, string sceneAssetPath, UnityVersion unityVersion)
         {
-            var occlusionSettingsInfo = levelFile.table.GetAssetsOfType((int)AssetClassID.OcclusionCullingSettings).FirstOrDefault();
+            var occlusionSettingsInfo = levelFile.file.GetAssetsOfType(AssetClassID.OcclusionCullingSettings).FirstOrDefault();
             Guid guid;
             if (occlusionSettingsInfo != null)
             {
-                var occlusionSettings = assetsManager.GetTypeInstance(levelFile, occlusionSettingsInfo);
-                var baseField = occlusionSettings.GetBaseField();
+                var baseField = assetsManager.GetBaseField(levelFile, occlusionSettingsInfo);
                 var guidField = baseField.Get("m_SceneGUID");
-                guid = new Guid(guidField.children.Select(el => el.value.value.asUInt32).SelectMany(BitConverter.GetBytes).ToArray());
+                guid = new Guid(new GUID128()
+                {
+                    data0 = guidField.Children[0].Value.AsUInt,
+                    data1 = guidField.Children[1].Value.AsUInt,
+                    data2 = guidField.Children[2].Value.AsUInt,
+                    data3 = guidField.Children[3].Value.AsUInt,
+                }.ToString());
             }
             else
             {
@@ -168,73 +182,73 @@ namespace AssetsExporter
             }
 
             var sceneCollection = new SceneCollection();
-            sceneCollection.Assets.AddRange(levelFile.table.assetFileInfo.Select(el => assetsManager.GetExtAsset(levelFile, 0, el.index)));
+            sceneCollection.Assets.AddRange(levelFile.file.AssetInfos.Select(el => assetsManager.GetExtAsset(levelFile, 0, el.PathId)));
             var sceneMeta = new MetaFile(sceneCollection, guid);
 
             var outputScenePath = Path.Combine(outputDirectory, sceneAssetPath);
 
-            SaveCollection(sceneCollection, sceneMeta, outputScenePath);
+            SaveCollection(sceneCollection, sceneMeta, outputScenePath, unityVersion);
 
         }
 
-        private void ExportGlobalGameManagers(AssetsFileInstance globalGameManagersFile, out AssetExternal buildSettings)
+        private void ExportGlobalGameManagers(AssetsFileInstance globalGameManagersFile, UnityVersion unityVersion, out AssetExternal buildSettings)
         {
-            foreach (var info in globalGameManagersFile.table.assetFileInfo)
+            foreach (var info in globalGameManagersFile.file.AssetInfos)
             {
-                if (ignoreTypesOnExport.Contains((AssetClassID)info.curFileType))
+                if (ignoreTypesOnExport.Contains((AssetClassID)info.TypeId))
                 {
                     continue;
                 }
 
-                if (!projectSettingAssetToFileName.TryGetValue((AssetClassID)info.curFileType, out var fileName))
+                if (!projectSettingAssetToFileName.TryGetValue((AssetClassID)info.TypeId, out var fileName))
                 {
-                    fileName = Enum.GetName(typeof(AssetClassID), info.curFileType);
+                    fileName = Enum.GetName(typeof(AssetClassID), info.TypeId);
                 }
 
-                var collection = new AssetCollection { Assets = { assetsManager.GetExtAsset(globalGameManagersFile, 0, info.index) } };
-                SaveCollection(collection, null, Path.Combine(outputProjectSettingsDirectory, $"{fileName}.{collection.ExportExtension}"));
+                var collection = new ProjectSettingCollection { Assets = { assetsManager.GetExtAsset(globalGameManagersFile, 0, info.PathId) } };
+                SaveCollection(collection, null, Path.Combine(outputProjectSettingsDirectory, $"{fileName}.{collection.ExportExtension}"), unityVersion);
             }
 
-            buildSettings = assetsManager.GetExtAsset(globalGameManagersFile, 0, globalGameManagersFile.table.GetAssetsOfType((int)AssetClassID.BuildSettings).First().index);
+            buildSettings = assetsManager.GetExtAsset(globalGameManagersFile, 0, globalGameManagersFile.file.GetAssetsOfType(AssetClassID.BuildSettings).First().PathId);
 
-            var gameUnityVersion = buildSettings.instance.GetBaseField().Get("m_Version").GetValue().value.asString;
+            var gameUnityVersion = buildSettings.baseField.Get("m_Version").AsString;
             File.WriteAllText(Path.Combine(outputProjectSettingsDirectory, "ProjectVersion.txt"), $"m_EditorVersion: {gameUnityVersion}");
         }
 
-        private void ExportAllAssets(AssetsFileInstance fileInstance)
+        private void ExportAllAssets(AssetsFileInstance fileInstance, UnityVersion unityVersion)
         {
             var assetToRootAsset = pptrExporterInfo.fileAssetToRootAsset.GetOrAdd(fileInstance);
-            foreach (var assetInfo in fileInstance.table.assetFileInfo)
+            foreach (var assetInfo in fileInstance.file.AssetInfos)
             {
                 while (pptrExporterInfo.foundNewCollections.Count > 0)
                 {
                     var foundCollection = pptrExporterInfo.foundNewCollections[0];
                     pptrExporterInfo.foundNewCollections.RemoveAt(0);
-                    if (ignoreTypesOnExport.Contains((AssetClassID)(foundCollection.MainAsset?.info.curFileType ?? -1u)))
+                    if (ignoreTypesOnExport.Contains((AssetClassID)(foundCollection.MainAsset?.info.TypeId ?? -1u)))
                     {
                         continue;
                     }
-                    ExportCollection(foundCollection);
+                    ExportCollection(foundCollection, unityVersion);
                 }
 
-                if (ignoreTypesOnExport.Contains((AssetClassID)assetInfo.curFileType) || assetToRootAsset.ContainsKey(assetInfo.index))
+                if (ignoreTypesOnExport.Contains((AssetClassID)assetInfo.TypeId) || assetToRootAsset.ContainsKey(assetInfo.PathId))
                 {
                     continue;
                 }
 
-                var asset = assetsManager.GetExtAsset(fileInstance, 0, assetInfo.index);
+                var asset = assetsManager.GetExtAsset(fileInstance, 0, assetInfo.PathId);
                 var collection = AssetCollection.CreateAssetCollection(assetsManager, asset);
 
-                var mainAssetId = collection.MainAsset.Value.info.index;
+                var mainAssetId = collection.MainAsset.Value.info.PathId;
                 foreach (var cAsset in collection.Assets)
                 {
-                    assetToRootAsset[cAsset.info.index] = mainAssetId;
+                    assetToRootAsset[cAsset.info.PathId] = mainAssetId;
                 }
-                ExportCollection(collection);
+                ExportCollection(collection, unityVersion);
             }
         }
 
-        private void ExportCollection(BaseAssetCollection collection)
+        private void ExportCollection(BaseAssetCollection collection, UnityVersion unityVersion)
         {
             var mainAsset = collection.MainAsset.Value;
             var fileInstance = mainAsset.file;
@@ -243,7 +257,7 @@ namespace AssetsExporter
 
             var meta = new MetaFile(collection);
 
-            var mainAssetId = mainAsset.info.index;
+            var mainAssetId = mainAsset.info.PathId;
             if (assetIdToPath != null && assetIdToPath.TryGetValue(mainAssetId, out var assetPath))
             {
                 assetPath = Path.Combine(outputPath, $"{assetPath}.{collection.ExportExtension}");
@@ -253,7 +267,7 @@ namespace AssetsExporter
                 assetPath = GetUniqueOutputPathForCollection(collection);
             }
 
-            SaveCollection(collection, meta, assetPath);
+            SaveCollection(collection, meta, assetPath, unityVersion);
         }
 
         private string GetUniqueOutputPathForCollection(BaseAssetCollection collection)
@@ -265,16 +279,16 @@ namespace AssetsExporter
 
             var mainAsset = collection.MainAsset.Value;
             var typeString = "";
-            if ((AssetClassID)mainAsset.info.curFileType == AssetClassID.MonoBehaviour)
+            if ((AssetClassID)mainAsset.info.TypeId == AssetClassID.MonoBehaviour)
             {
                 //if MonoBehaviour is here, then it doesn't have GameObject which means it's a ScriptableObject
-                var scriptAsset = assetsManager.GetExtAsset(mainAsset.file, mainAsset.instance.GetBaseField().Get("m_Script"));
-                var scriptName = scriptAsset.instance.GetBaseField().Get("m_ClassName").GetValue().AsString();
+                var scriptAsset = assetsManager.GetExtAsset(mainAsset.file, mainAsset.baseField.Get("m_Script"));
+                var scriptName = scriptAsset.baseField.Get("m_ClassName").AsString;
                 typeString = $"ScriptableObject/{scriptName}";
             }
             else if (string.IsNullOrWhiteSpace(typeString))
             {
-                typeString = Enum.GetName(typeof(AssetClassID), mainAsset.info.curFileType);
+                typeString = Enum.GetName(typeof(AssetClassID), mainAsset.info.TypeId);
             }
 
             var outputFolderByType = Path.Combine(outputAssetsPathDirectory, typeString);
@@ -299,18 +313,18 @@ namespace AssetsExporter
 
         private string TryGetAssetName(AssetExternal asset)
         {
-            var baseField = asset.instance.GetBaseField();
+            var baseField = asset.baseField;
             var nameField = baseField.Get("m_Name");
             var name = "";
 
-            if (!nameField.IsDummy())
+            if (!nameField.IsDummy)
             {
-                name = nameField.GetValue().AsString();
+                name = nameField.AsString;
             }
 
-            if (string.IsNullOrWhiteSpace(name) && (AssetClassID)asset.info.curFileType == AssetClassID.Shader)
+            if (string.IsNullOrWhiteSpace(name) && (AssetClassID)asset.info.TypeId == AssetClassID.Shader)
             {
-                name = baseField.Get("m_ParsedForm").Get("m_Name").GetValue().AsString();
+                name = baseField.Get("m_ParsedForm").Get("m_Name").AsString;
             }
 
             if (string.IsNullOrWhiteSpace(name))
@@ -321,7 +335,7 @@ namespace AssetsExporter
             return name;
         }
 
-        private void SaveCollection(BaseAssetCollection collection, MetaFile meta, string outputFilePath)
+        private void SaveCollection(BaseAssetCollection collection, MetaFile meta, string outputFilePath, UnityVersion unityVersion)
         {
             Directory.CreateDirectory(Path.GetDirectoryName(outputFilePath));
 
@@ -329,7 +343,7 @@ namespace AssetsExporter
             using (var streamWriter = new InvariantStreamWriter(file))
             {
                 var yamlWriter = new YAMLWriter();
-                foreach (var doc in exportManager.Export(collection, assetsManager, exporterInfo))
+                foreach (var doc in exportManager.Export(collection, assetsManager, unityVersion, exporterInfo))
                 {
                     yamlWriter.AddDocument(doc);
                 }
