@@ -1,5 +1,6 @@
 ﻿using AssetsTools.NET;
 using AssetsTools.NET.Extra;
+using AssetsTools.NET.Texture;
 using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -14,6 +15,7 @@ namespace AssetsView.Winforms
     {
         Bitmap image;
 
+        string loadedFileName;
         bool loaded;
         float x, y;
         int width, height;
@@ -31,22 +33,26 @@ namespace AssetsView.Winforms
 
             //bundle resS
             TextureFile.StreamingInfo streamInfo = tf.m_StreamData;
-            if (streamInfo.path != null && streamInfo.path.StartsWith("archive:/") && inst.parentBundle != null)
+            if (streamInfo.path != null && inst.parentBundle != null)
             {
-                string searchPath = streamInfo.path.Substring(9);
+                string searchPath = streamInfo.path;
+
+                if (streamInfo.path.StartsWith("archive:/"))
+                    searchPath = searchPath.Substring(9);
+
                 searchPath = Path.GetFileName(searchPath);
 
                 AssetBundleFile bundle = inst.parentBundle.file;
 
-                AssetsFileReader reader = bundle.reader;
-                AssetBundleDirectoryInfo06[] dirInf = bundle.bundleInf6.dirInf;
+                AssetsFileReader reader = bundle.DataReader;
+                AssetBundleDirectoryInfo[] dirInf = bundle.BlockAndDirInfo.DirectoryInfos;
                 bool foundFile = false;
                 for (int i = 0; i < dirInf.Length; i++)
                 {
-                    AssetBundleDirectoryInfo06 info = dirInf[i];
-                    if (info.name == searchPath)
+                    AssetBundleDirectoryInfo info = dirInf[i];
+                    if (info.Name == searchPath)
                     {
-                        reader.Position = bundle.bundleHeader6.GetFileDataOffset() + info.offset + (long)streamInfo.offset;
+                        reader.Position = info.Offset + (long)streamInfo.offset;
                         tf.pictureData = reader.ReadBytes((int)streamInfo.size);
                         tf.m_StreamData.offset = 0;
                         tf.m_StreamData.size = 0;
@@ -66,9 +72,17 @@ namespace AssetsView.Winforms
             {
                 string fmtName = ((TextureFormat)tf.m_TextureFormat).ToString().Replace("_", " ");
                 Text = $"Texture Viewer [{fmtName}]";
+                loadedFileName = tf.m_Name;
 
-                image = new Bitmap(tf.m_Width, tf.m_Height, tf.m_Width * 4, PixelFormat.Format32bppArgb,
-                    Marshal.UnsafeAddrOfPinnedArrayElement(texDat, 0));
+                image = new Bitmap(tf.m_Width, tf.m_Height, PixelFormat.Format32bppArgb);
+
+                Rectangle rect = new Rectangle(0, 0, image.Width, image.Height);
+                BitmapData picData = image.LockBits(rect, ImageLockMode.ReadWrite, image.PixelFormat);
+                picData.Stride = tf.m_Width * 4;
+                IntPtr startAddr = picData.Scan0;
+                Marshal.Copy(texDat, 0, startAddr, texDat.Length);
+
+                image.UnlockBits(picData);
                 image.RotateFlip(RotateFlipType.RotateNoneFlipY);
 
                 x = 0;
@@ -106,6 +120,39 @@ namespace AssetsView.Winforms
             y = newImageY - oldImageY + y;
 
             Refresh();
+        }
+
+        private void TextureViewer_FormClosed(object sender, FormClosedEventArgs e)
+        {
+            if (loaded && image != null)
+            {
+                image.Dispose();
+                loaded = false;
+            }
+        }
+
+        public void SaveTexture()
+        {
+            if(image == null)
+            {
+                return;
+            }
+            SaveFileDialog texSaveDialog = new SaveFileDialog();
+            texSaveDialog.Filter = ".PNG File|*.png";
+            texSaveDialog.Title = "Save texture as .PNG file";
+            texSaveDialog.FileName = loadedFileName;
+            DialogResult res = texSaveDialog.ShowDialog();
+            string selectedName = texSaveDialog.FileName;
+            if (res == DialogResult.Cancel || res == DialogResult.No || string.IsNullOrWhiteSpace(selectedName))
+            {
+                return;
+            }
+            if (File.Exists(selectedName))
+            {
+                File.Delete(selectedName);
+            }
+            image.Save(selectedName, ImageFormat.Png);
+            MessageBox.Show("Done!");
         }
 
         private void TextureViewer_Paint(object sender, PaintEventArgs e)
